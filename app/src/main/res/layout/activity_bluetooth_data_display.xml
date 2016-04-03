@@ -1,59 +1,12 @@
-<?xml version="1.0" encoding="utf-8"?>
-<!--
+<RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    xmlns:tools="http://schemas.android.com/tools"
     android:paddingLeft="@dimen/activity_horizontal_margin"
     android:paddingRight="@dimen/activity_horizontal_margin"
     android:paddingTop="@dimen/activity_vertical_margin"
     android:paddingBottom="@dimen/activity_vertical_margin"
--->
-<RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
-    xmlns:app="http://schemas.android.com/apk/res-auto"
-    xmlns:tools="http://schemas.android.com/tools"
-    android:layout_width="match_parent"
-    android:layout_height="match_parent"
-    android:fitsSystemWindows="true"
-    tools:context="com.nanobiotechru.android.nanobiotechandroid.activities.BluetoothDataDisplayActivity">
-
-    <com.androidplot.xy.XYPlot
-        android:id="@+id/plot"
-        android:layout_width="fill_parent"
-        android:layout_height="fill_parent"
-
-        app:label="A Simple XY Plot"
-        app:rangeLabel="range"
-        app:domainLabel="domain"
-
-        app:borderColor="#000000"
-        app:backgroundColor="#808080"
-        app:graphBackgroundColor="#808080"
-        app:gridBackgroundColor="#CCCCCC"
-        app:graphDomainLineColor="#FFFFFF"
-        app:graphRangeLineColor="#FFFFFF"
-
-        app:gridPaddingLeft="10dp"
-        app:gridPaddingRight="10dp"
-        app:gridPaddingTop="10dp"
-        app:gridPaddingBottom="10dp"
-        app:graphMarginTop="20dp"
-        app:graphMarginBottom="40dp"
-        app:graphMarginLeft="15dp"
-        app:graphMarginRight="10dp"
-
-        app:labelTextSize="15sp"
-        app:rangeLabelTextSize="13sp"
-        app:domainLabelTextSize="13sp"
-        app:rangeTickLabelTextSize="10sp"
-        app:rangeOriginTickLabelTextSize="13sp"
-        app:domainTickLabelTextSize="10sp"
-        app:domainOriginTickLabelTextSize="13sp"
-        app:legendTextSize="13sp"
-
-        app:graphDomainLineThickness="1dp"
-        app:graphRangeLineThickness="1dp"
-
-        app:legendIconHeight="15dp"
-        app:legendIconWidth="15dp"
-        app:legendHeight="25dp"
-        app:legendAnchorPosition="right_bottom"/>
+    tools:context="com.runanobiolab.hemocentric.activities.BluetoothDataDisplayActivity">
 
     <!--
     <EditText
@@ -72,6 +25,7 @@
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:text="Start"
+        android:layout_alignParentTop="true"
         android:layout_alignParentStart="true" />
 
     <!--
@@ -101,6 +55,14 @@
         android:layout_height="wrap_content"
         android:layout_width="wrap_content"
         android:layout_below="@+id/analyze_btn" />
+
+    <Button
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="View Graph"
+        android:id="@+id/Graph"
+        android:layout_below="@+id/display_peaks_view"
+        android:layout_alignParentStart="true" />
 
     <!--
     <TextView

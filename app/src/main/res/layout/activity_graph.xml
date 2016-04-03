@@ -1,0 +1,56 @@
+<?xml version="1.0" encoding="utf-8"?>
+<RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:paddingBottom="@dimen/activity_vertical_margin"
+    android:paddingLeft="@dimen/activity_horizontal_margin"
+    android:paddingRight="@dimen/activity_horizontal_margin"
+    android:paddingTop="@dimen/activity_vertical_margin"
+    tools:context="com.runanobiolab.hemocentric.activities.Graph">
+
+    <com.androidplot.xy.XYPlot
+        android:id="@+id/plot"
+        android:layout_width="fill_parent"
+        android:layout_height="fill_parent"
+
+        app:label="A Simple XY Plot"
+        app:rangeLabel="range"
+        app:domainLabel="domain"
+
+        app:borderColor="#000000"
+        app:backgroundColor="#FFFFFF"
+        app:graphBackgroundColor="#FFFFFF"
+        app:gridBackgroundColor="#fbf3d5"
+        app:graphDomainLineColor="#d6cc9f"
+        app:graphRangeLineColor="#d6cc9f"
+        app:labelTextColor="#000000"
+
+        app:gridPaddingLeft="10dp"
+        app:gridPaddingRight="10dp"
+        app:gridPaddingTop="10dp"
+        app:gridPaddingBottom="10dp"
+        app:graphMarginTop="20dp"
+        app:graphMarginBottom="40dp"
+        app:graphMarginLeft="15dp"
+        app:graphMarginRight="10dp"
+
+        app:labelTextSize="15sp"
+        app:rangeLabelTextSize="13sp"
+        app:domainLabelTextSize="13sp"
+        app:rangeTickLabelTextSize="10sp"
+        app:rangeOriginTickLabelTextSize="13sp"
+        app:domainTickLabelTextSize="10sp"
+        app:domainOriginTickLabelTextSize="13sp"
+        app:legendTextSize="13sp"
+
+        app:graphDomainLineThickness="1dp"
+        app:graphRangeLineThickness="1dp"
+
+        app:legendIconHeight="15dp"
+        app:legendIconWidth="15dp"
+        app:legendHeight="25dp"
+        app:legendAnchorPosition="right_bottom"/>
+
+</RelativeLayout>

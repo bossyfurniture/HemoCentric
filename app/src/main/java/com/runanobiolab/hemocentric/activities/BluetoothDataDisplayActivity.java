@@ -4,6 +4,7 @@ import android.bluetooth.BluetoothDevice;
 import android.bluetooth.BluetoothGatt;
 import android.bluetooth.BluetoothGattCharacteristic;
 import android.bluetooth.BluetoothGattService;
+import android.content.Intent;
 import android.graphics.Color;
 import android.os.Bundle;
 import android.os.Environment;
@@ -16,7 +17,7 @@ import android.widget.Button;
 import android.widget.EditText;
 import android.widget.TextView;
 
-import com.androidplot.xy.*;
+
 import com.runanobiolab.hemocentric.R;
 import com.runanobiolab.hemocentric.bluetooth.BluetoothHelper;
 import com.runanobiolab.hemocentric.bluetooth.interfaces.BleWrapperUiCallbacks;
@@ -44,6 +45,7 @@ public class BluetoothDataDisplayActivity extends ActionBarActivity {
     private TextView pointsData;
     private TextView peakData;
     private Button analyzeData;
+    private Button Graph;
 
     //TESTING (temporary)
     private static int storedPoints = 0;
@@ -54,10 +56,7 @@ public class BluetoothDataDisplayActivity extends ActionBarActivity {
     private BluetoothGattCharacteristic characteristic;
     private BluetoothHelper helper;
 
-    //PLOTTING
-    private static final int SAMPLE_HISTORY = 1000;
-    private XYPlot plot;
-    private SimpleXYSeries liadata;
+    private static double[] doubleData;
 
 
     public static File makeExternalFile(String filename) {
@@ -65,7 +64,7 @@ public class BluetoothDataDisplayActivity extends ActionBarActivity {
         try {
             String state = Environment.getExternalStorageState();
             if (Environment.MEDIA_MOUNTED.equals(state)) {
-                File docsFolder = new File(Environment.getExternalStorageDirectory() + "/Documents/NBTA");
+                File docsFolder = new File(Environment.getExternalStorageDirectory() + "/NBTA");
                 boolean isPresent = true;
                 if (!docsFolder.exists()) {
                     isPresent = docsFolder.mkdir();
@@ -73,7 +72,7 @@ public class BluetoothDataDisplayActivity extends ActionBarActivity {
                 if (isPresent) {
                     file = new File(docsFolder.getAbsolutePath(),filename);
                 } else {
-                    Log.e("BDDA", "Cannot Create Directory.");
+                    Log.e("BDDA", "Cannot Create Directory in "+Environment.getExternalStorageDirectory()+".");
                     file = null;
                 }
             } else {
@@ -89,7 +88,7 @@ public class BluetoothDataDisplayActivity extends ActionBarActivity {
 
     //Function for updating the plot maybe update every 5-10?
     //synchronized
-    public void updatePlot(Number val) {
+    /*public void updatePlot(Number val) {
         if(liadata.size() > SAMPLE_HISTORY){
             liadata.removeFirst();
         }
@@ -97,12 +96,12 @@ public class BluetoothDataDisplayActivity extends ActionBarActivity {
         //Log.e("BDDA", liadata.size() + "updated plot " + val);
 
     }
+    */
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_bluetooth_data_display);
-
 
         //Text fields and buttons
         //inputData = (EditText)findViewById(R.id.input_data_field);
@@ -111,20 +110,8 @@ public class BluetoothDataDisplayActivity extends ActionBarActivity {
         //pointsData = (TextView)findViewById(R.id.display_points_view);
         peakData = (TextView)findViewById(R.id.display_peaks_view);
         analyzeData = (Button)findViewById(R.id.analyze_btn);
+        Graph = (Button)findViewById((R.id.Graph));
 
-        //plotting
-        plot = (XYPlot)findViewById(R.id.plot);
-        liadata = new SimpleXYSeries("Sensor Data");
-        //plot.setRangeBoundaries(-5, 5, BoundaryMode.FIXED);
-        plot.setRangeBoundaries(-5.2, 5.2, BoundaryMode.FIXED);
-        plot.setDomainBoundaries(0, 11000, BoundaryMode.FIXED);
-        plot.addSeries(liadata, new LineAndPointFormatter(Color.rgb(100, 100, 200), null, null, null));
-        plot.setDomainStepValue(11);
-        plot.setTicksPerRangeLabel(1);
-        plot.setDomainLabel("Sample Index");
-        plot.setRangeLabel("Voltage [V]");
-        plot.getDomainLabelWidget().pack();
-        plot.getRangeLabelWidget().pack();
 
         /*
         // setup checkboxes:
@@ -192,7 +179,7 @@ public class BluetoothDataDisplayActivity extends ActionBarActivity {
                     bw = new BufferedWriter(new FileWriter(file_bytes, true),1000);
                     for(byte byt : rawValue){
                         bw.write((byt & 0xFF) + "\n");
-                        updatePlot(RToD(byt & 0xFF));
+                        //updatePlot(RToD(byt & 0xFF));
                     }
                     bw.flush();
                     bw.close();
@@ -210,7 +197,7 @@ public class BluetoothDataDisplayActivity extends ActionBarActivity {
                         //pointsData.setText("approx. Points Received: " + storedPoints*20);
                         try{
                             Thread.sleep(100);
-                            plot.redraw();
+                            //plot.redraw();
                         }catch(InterruptedException e){
                             Log.e("BDDA", "Sleep Interrupted\n");
                         }
@@ -309,14 +296,14 @@ public class BluetoothDataDisplayActivity extends ActionBarActivity {
             @Override
             public void onClick(View v) {
 
-                    //String data = inputData.getText().toString();
-                    String data = "a";
+                //String data = inputData.getText().toString();
+                String data = "a";
 
-                    byte[] dataBytes = data.getBytes();                    //{(byte)integer};
+                byte[] dataBytes = data.getBytes();                    //{(byte)integer};
 
-                    storedPoints = 0;
+                storedPoints = 0;
 
-                    helper.writeDataToCharacteristic(characteristic,dataBytes);
+                helper.writeDataToCharacteristic(characteristic, dataBytes);
 
             }
         });
@@ -330,7 +317,7 @@ public class BluetoothDataDisplayActivity extends ActionBarActivity {
                 double[] data = null;
 
 
-                data = parseData(file_bytes, true, plot); //true=delete raw_file every time
+                data = parseData(file_bytes, true); //true=delete raw_file every time
                 if(data != null){
                     int numMaxes = newFindPeak(data, .5);
                     /* Old Find Peak
@@ -346,6 +333,15 @@ public class BluetoothDataDisplayActivity extends ActionBarActivity {
                     peakData.setText("No Data Found");
                 }
 
+            }
+        });
+
+        //Open the Graph activity
+        Graph.setOnClickListener(new View.OnClickListener(){
+            public void onClick(View v){
+                Intent intent=new Intent(BluetoothDataDisplayActivity.this,Graph.class);
+                intent.putExtra("all the data",doubleData);
+                startActivity(intent);
             }
         });
 
@@ -375,7 +371,7 @@ public class BluetoothDataDisplayActivity extends ActionBarActivity {
      * double[] smoothedData = filterData(detrend(parseData(rawData)));
      * boolean[] peakArray = findPeaks(smoothedData, peakThreshold, dropFactor=0);
      */
-    public static double[] parseData(File f, boolean delete, XYPlot plot){
+    public static double[] parseData(File f, boolean delete){
         // Reading Input, customize according to source
         //return null;
 
@@ -410,17 +406,13 @@ public class BluetoothDataDisplayActivity extends ActionBarActivity {
             }
 
             // Conversion to double
-            double[] doubleData = new double[points];
+            doubleData = new double[points];
             for(int i=0; i<points; i++){
                 //replace with RToD()
                 doubleData[i] = 2.0*((double)tempData[i]*(5.0/256)) - 5.0;
             }
 
-            List<Double> notGood = new ArrayList<Double>(10000);
-            for(double d : doubleData) notGood.add(d);
-            SimpleXYSeries raw = new SimpleXYSeries(notGood, SimpleXYSeries.ArrayFormat.Y_VALS_ONLY, "Sensor Data");
-            plot.addSeries(raw, new LineAndPointFormatter(Color.rgb(100, 100, 200), null, null, null));
-            plot.redraw();
+
 
             //save as text file
             //TODO: Check for file creation failure
