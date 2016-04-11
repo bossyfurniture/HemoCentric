@@ -195,12 +195,6 @@ public class BluetoothDataDisplayActivity extends ActionBarActivity {
                     public void run(){
                         // should be 20 bytes/packet
                         //pointsData.setText("approx. Points Received: " + storedPoints*20);
-                        try{
-                            Thread.sleep(100);
-                            //plot.redraw();
-                        }catch(InterruptedException e){
-                            Log.e("BDDA", "Sleep Interrupted\n");
-                        }
                     }
                 });
 
