@@ -35,7 +35,7 @@ import java.util.List;
 public class BluetoothDataDisplayActivity extends ActionBarActivity {
 
 
-    //private final String BLE_MAC_ADDRESS = "20:C3:8F:D5:35:06"; old string
+    //private final String BLE_MAC_ADDRESS = "20:C3:8F:D5:35:06"; old BLE Module (broken)
     private final String BLE_MAC_ADDRESS = "74:DA:EA:B2:67:9A";
 
     //UI ELEMENTS
@@ -113,40 +113,6 @@ public class BluetoothDataDisplayActivity extends ActionBarActivity {
         Graph = (Button)findViewById((R.id.Graph));
 
 
-        /*
-        // setup checkboxes:
-        hwAcceleratedCb = (CheckBox) findViewById(R.id.hwAccelerationCb);
-        final PlotStatistics levelStats = new PlotStatistics(1000, false);
-        final PlotStatistics histStats = new PlotStatistics(1000, false);
-
-        aprLevelsPlot.addListener(levelStats);
-        aprHistoryPlot.addListener(histStats);
-        hwAcceleratedCb.setOnCheckedChangeListener(new CompoundButton.OnCheckedChangeListener() {
-            @Override
-            public void onCheckedChanged(CompoundButton compoundButton, boolean b) {
-                if(b) {
-                    aprLevelsPlot.setLayerType(View.LAYER_TYPE_NONE, null);
-                    aprHistoryPlot.setLayerType(View.LAYER_TYPE_NONE, null);
-                } else {
-                    aprLevelsPlot.setLayerType(View.LAYER_TYPE_SOFTWARE, null);
-                    aprHistoryPlot.setLayerType(View.LAYER_TYPE_SOFTWARE, null);
-                }
-            }
-        });
-        showFpsCb = (CheckBox) findViewById(R.id.showFpsCb);
-        showFpsCb.setOnCheckedChangeListener(new CompoundButton.OnCheckedChangeListener() {
-            @Override
-            public void onCheckedChanged(CompoundButton compoundButton, boolean b) {
-                levelStats.setAnnotatePlotEnabled(b);
-                histStats.setAnnotatePlotEnabled(b);
-            }
-        });
-        */
-
-
-
-
-
 
         //TODO: change to one central filename
         String filename = "arddata_raw.txt";
@@ -178,7 +144,7 @@ public class BluetoothDataDisplayActivity extends ActionBarActivity {
                     // need checks for no ext. storage
                     bw = new BufferedWriter(new FileWriter(file_bytes, true),1000);
                     for(byte byt : rawValue){
-                        bw.write((byt & 0xFF) + "\n");
+                        bw.write((byt & 0xFF) + "\n"); //converts each byte into an unsigned int (0-255)
                         //updatePlot(RToD(byt & 0xFF));
                     }
                     bw.flush();
@@ -290,10 +256,9 @@ public class BluetoothDataDisplayActivity extends ActionBarActivity {
             @Override
             public void onClick(View v) {
 
-                //String data = inputData.getText().toString();
-                String data = "a";
+                String data = "a"; //sent to the BLE module to start data collection
 
-                byte[] dataBytes = data.getBytes();                    //{(byte)integer};
+                byte[] dataBytes = data.getBytes(); //{(byte)integer};
 
                 storedPoints = 0;
 
@@ -313,7 +278,7 @@ public class BluetoothDataDisplayActivity extends ActionBarActivity {
 
                 data = parseData(file_bytes, true); //true=delete raw_file every time
                 if(data != null){
-                    int numMaxes = newFindPeak(data, .5);
+                    int numMaxes = newFindPeak(data, minPeakThreshold);
                     /* Old Find Peak
                     double[] smoothed;
                     smoothed = filterData(detrend(data));
@@ -341,6 +306,7 @@ public class BluetoothDataDisplayActivity extends ActionBarActivity {
 
     }
 
+    // Lightweight but still a good estimate of peaks.
     // Triggers on the rising and falling edge to detect a peak.
     public static int newFindPeak(double[] data, double threshold){
         boolean aboveThreshold = false;
@@ -352,18 +318,20 @@ public class BluetoothDataDisplayActivity extends ActionBarActivity {
                 peaksFound++;
                 aboveThreshold = false;
             }
-
         }
         return peaksFound;
     }
 
-    public double RToD(int raw){
+    // Converts the int received from the Arduino in to its corresponding double value
+    // Maps (0, 255) to (-5, 5)
+    public static double RToD(int raw){
         return 2.0*((double)raw*(5.0/256)) - 5.0;
     }
 
-    /** This code works on the complete data-set. Working on a point-by-point version.
-     * double[] smoothedData = filterData(detrend(parseData(rawData)));
-     * boolean[] peakArray = findPeaks(smoothedData, peakThreshold, dropFactor=0);
+    /**
+     * This code works on the complete data-set.
+     * It parses the data from digital(int) -> voltage(double)
+     * It saves the data, and also returns it for use in the app
      */
     public static double[] parseData(File f, boolean delete){
         // Reading Input, customize according to source
@@ -402,18 +370,15 @@ public class BluetoothDataDisplayActivity extends ActionBarActivity {
             // Conversion to double
             doubleData = new double[points];
             for(int i=0; i<points; i++){
-                //replace with RToD()
-                doubleData[i] = 2.0*((double)tempData[i]*(5.0/256)) - 5.0;
+                doubleData[i] = RToD(tempData[i]); //2.0*((double)tempData[i]*(5.0/256)) - 5.0;
             }
 
 
 
             //save as text file
-            //TODO: Check for file creation failure
             File file_double = makeExternalFile("arddata_double_" + System.currentTimeMillis() + ".txt");
             BufferedWriter bw;
             try {
-
                 bw = new BufferedWriter(new FileWriter(file_double, true),1000);
                 for(double d: doubleData){
                     bw.write(d + "\n");
@@ -423,7 +388,7 @@ public class BluetoothDataDisplayActivity extends ActionBarActivity {
             }catch (Exception e){
                 e.printStackTrace();
             }finally {
-                if(delete) f.delete();
+                if(delete) f.delete(); //delete the raw data file of ints
             }
 
             return doubleData;
@@ -433,40 +398,66 @@ public class BluetoothDataDisplayActivity extends ActionBarActivity {
             return null;
         }
 
-        /*
-        if(!test && storedPoints > 0) {
-            StringBuilder sb = new StringBuilder();
-            int j = 0;
-            for(String s : dataString){
-                if(j > storedPoints) break;
-                sb.append(s);
-                j++;
-                Log.e("BDDA", "sb_append: \n[" + s + "]");
-            }
-            String superString = sb.toString();
-
-            String[] values = superString.split("\\s+"); //\\s+
-            double[] data = new double[values.length+1];
-            int i = 0;
-            for(String val : values){
-
-                try {
-                    data[i] = Double.valueOf(val);
-                    i++;
-                }catch(NumberFormatException e){
-                    data[i] = -1;
-                    i++;
-                    //Log.e("BDDA", "NFE: " + val);
-                }
-
-            }
-            return data;
-        }else if(test){
-            return null;
-        }
-        */
     }
 
+
+    final protected static char[] hexArray = "0123456789ABCDEF".toCharArray();
+    public static String bytesToHex(byte[] bytes) {
+        char[] hexChars = new char[bytes.length * 2];
+        for ( int j = 0; j < bytes.length; j++ ) {
+            int v = bytes[j] & 0xFF;
+            hexChars[j * 2] = hexArray[v >>> 4];
+            hexChars[j * 2 + 1] = hexArray[v & 0x0F];
+        }
+        return new String(hexChars);
+    }
+
+    public static int byteArrayToInt(byte[] b)
+    {
+        return   b[3] & 0xFF |
+                (b[2] & 0xFF) << 8 |
+                (b[1] & 0xFF) << 16 |
+                (b[0] & 0xFF) << 24;
+    }
+
+    @Override
+    public boolean onCreateOptionsMenu(Menu menu) {
+        // Inflate the menu; this adds items to the action bar if it is present.
+        getMenuInflater().inflate(R.menu.menu_bluetooth_data_display, menu);
+        return true;
+    }
+
+    @Override
+    public boolean onOptionsItemSelected(MenuItem item) {
+        // Handle action bar item clicks here. The action bar will
+        // automatically handle clicks on the Home/Up button, so long
+        // as you specify a parent activity in AndroidManifest.xml
+        int id = item.getItemId();
+
+        //noinspection SimplifiableIfStatement
+        if (id == R.id.action_settings) {
+            return true;
+        }
+
+        return super.onOptionsItemSelected(item);
+    }
+
+
+
+
+    /**
+     * At the moment, none of the functions below are necessary, mainly due to
+     * the current threshold method is sufficient for detecting beads. This may change in
+     * the future if processing the data becomes necessary to aid in accurate detection.
+     */
+
+    /*
+    // Usage:
+    //     double[] smoothedData = filterData(detrend(parseData(rawData)));
+    //     boolean[] peakArray = findPeaks(smoothedData, peakThreshold, dropFactor=0);
+
+    // This function is not necessary at the moment, as the analog LIA does
+    // a good job of removing baseline drift.
     public static double[] detrend(double[] data){
 
         int points = data.length;
@@ -491,7 +482,7 @@ public class BluetoothDataDisplayActivity extends ActionBarActivity {
 
     public static double[] filterData(double[] data){
 
-        //Moving Sum smoothing (not sure if this is the best way, but simple and without use of ext. libs)
+        //Moving Sum smoothing (not the fastest way, but simple and without use of ext. libs)
         // n-point (equally weighted) causal moving average
         // y[n] = (s[n] + s[n-1] + ...)/n;
         // goes through twice, one pass for each number in sampleRates
@@ -525,8 +516,10 @@ public class BluetoothDataDisplayActivity extends ActionBarActivity {
         return movingAvg;
     }
 
+    // overloaded function
+    // This function uses the characteristic positive peak followed by negative peak signature of
+    // an actual peak vs a noise spike, allowing for detection closer to the noise margin.
     public static boolean[] findPeaks(double[] data, double minPeakThreshold){ return findPeaks(data, minPeakThreshold, 0); }
-
     public static boolean[] findPeaks(double[] data, double minPeakThreshold, double peakFallRatio){
         int[] peak = {-1, -1}; // {max index (if not -1), min index (resume search there)}
         boolean[] maximums = new boolean[data.length];
@@ -583,45 +576,6 @@ public class BluetoothDataDisplayActivity extends ActionBarActivity {
         }
         return numMaxes;
     }
+    */
 
-    final protected static char[] hexArray = "0123456789ABCDEF".toCharArray();
-    public static String bytesToHex(byte[] bytes) {
-        char[] hexChars = new char[bytes.length * 2];
-        for ( int j = 0; j < bytes.length; j++ ) {
-            int v = bytes[j] & 0xFF;
-            hexChars[j * 2] = hexArray[v >>> 4];
-            hexChars[j * 2 + 1] = hexArray[v & 0x0F];
-        }
-        return new String(hexChars);
-    }
-
-    public static int byteArrayToInt(byte[] b)
-    {
-        return   b[3] & 0xFF |
-                (b[2] & 0xFF) << 8 |
-                (b[1] & 0xFF) << 16 |
-                (b[0] & 0xFF) << 24;
-    }
-
-    @Override
-    public boolean onCreateOptionsMenu(Menu menu) {
-        // Inflate the menu; this adds items to the action bar if it is present.
-        getMenuInflater().inflate(R.menu.menu_bluetooth_data_display, menu);
-        return true;
-    }
-
-    @Override
-    public boolean onOptionsItemSelected(MenuItem item) {
-        // Handle action bar item clicks here. The action bar will
-        // automatically handle clicks on the Home/Up button, so long
-        // as you specify a parent activity in AndroidManifest.xml
-        int id = item.getItemId();
-
-        //noinspection SimplifiableIfStatement
-        if (id == R.id.action_settings) {
-            return true;
-        }
-
-        return super.onOptionsItemSelected(item);
-    }
 }
