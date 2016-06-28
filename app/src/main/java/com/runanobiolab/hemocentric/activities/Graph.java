@@ -4,13 +4,13 @@ import android.content.Intent;
 import android.graphics.Color;
 import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
+import android.util.Log;
 import android.view.MenuItem;
 import android.view.View;
 import android.widget.Button;
 
 import com.androidplot.xy.*;
 import com.runanobiolab.hemocentric.R;
-
 import java.util.ArrayList;
 import java.util.List;
 
@@ -68,12 +68,17 @@ public class Graph extends AppCompatActivity {
         plot.setRangeLabel("Voltage [V]");
         plot.getDomainLabelWidget().pack();
         plot.getRangeLabelWidget().pack();
-        //plot(plot,doubleData);
+        try {
+            plot(plot, doubleData);
+        }catch (Exception e){
+            e.printStackTrace();
+            Log.i("Graph Activity","No Data to Plot");
+        }
     }
 
 
     private void plot(XYPlot plot, double[] doubleData){
-
+        plot.clear();
         List<Double> notGood = new ArrayList<Double>(10000);
         for(double d : doubleData) notGood.add(d);
         SimpleXYSeries raw = new SimpleXYSeries(notGood, SimpleXYSeries.ArrayFormat.Y_VALS_ONLY, "Sensor Data");

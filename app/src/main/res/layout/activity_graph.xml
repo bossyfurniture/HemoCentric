@@ -15,7 +15,7 @@
         android:layout_width="fill_parent"
         android:layout_height="fill_parent"
 
-        app:label="A Simple XY Plot"
+        app:label="Your Blood Activity"
         app:rangeLabel="range"
         app:domainLabel="domain"
 

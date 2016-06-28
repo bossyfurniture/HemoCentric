@@ -25,8 +25,8 @@
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:text="Start"
-        android:layout_alignParentTop="true"
-        android:layout_alignParentStart="true" />
+        android:layout_alignParentStart="true"
+        android:layout_below="@+id/spinner" />
 
     <!--
     <TextView
@@ -40,6 +40,50 @@
     <!--
         android:layout_centerVertical="true"
     -->
+    <Spinner
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:id="@+id/spinner"
+        android:layout_centerVertical="true"
+        android:layout_alignParentStart="true"
+        android:layout_alignParentTop="true"/>
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:textAppearance="?android:attr/textAppearanceSmall"
+        android:text="Hr"
+        android:id="@+id/textView1"
+        android:layout_toRightOf="@id/spinner"
+        android:layout_alignParentTop="true"/>
+    <Spinner
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:id="@+id/spinner2"
+        android:layout_toRightOf="@+id/textView1"
+        android:layout_alignParentTop="true"/>
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:textAppearance="?android:attr/textAppearanceSmall"
+        android:text="Min"
+        android:id="@+id/textView2"
+        android:layout_toRightOf="@id/spinner2"
+        android:layout_alignParentTop="true"/>
+    <Spinner
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:id="@+id/spinner3"
+        android:layout_toRightOf="@+id/textView2"
+        android:layout_alignParentTop="true"/>
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:textAppearance="?android:attr/textAppearanceSmall"
+        android:text="Sec"
+        android:id="@+id/textView3"
+        android:layout_below="@+id/Graph"
+        android:layout_toRightOf="@id/spinner3"
+        android:layout_alignParentTop="true"/>
     <Button
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
@@ -63,6 +107,9 @@
         android:id="@+id/Graph"
         android:layout_below="@+id/display_peaks_view"
         android:layout_alignParentStart="true" />
+
+
+
 
     <!--
     <TextView

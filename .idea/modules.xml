@@ -2,9 +2,8 @@
 <project version="4">
   <component name="ProjectModuleManager">
     <modules>
-      <module fileurl="file://$PROJECT_DIR$/.idea/HemoCentric.iml" filepath="$PROJECT_DIR$/.idea/HemoCentric.iml" />
       <module fileurl="file://$PROJECT_DIR$/HemoCentric.iml" filepath="$PROJECT_DIR$/HemoCentric.iml" />
-      <module fileurl="file://$PROJECT_DIR$/app/app.iml" filepath="$PROJECT_DIR$/app/app.iml" />
+      <module fileurl="file://$PROJECT_DIR$/.idea/HemoCentric.iml" filepath="$PROJECT_DIR$/.idea/HemoCentric.iml" />
       <module fileurl="file://$PROJECT_DIR$/app/app.iml" filepath="$PROJECT_DIR$/app/app.iml" />
     </modules>
   </component>
