@@ -19,7 +19,7 @@ public class Graph extends AppCompatActivity {
     private static final int SAMPLE_HISTORY = 1000;
     private XYPlot plot;
     private SimpleXYSeries liadata;
-    double[] doubleData;
+    private double[] doubleData;
 
 
     @Override
@@ -28,7 +28,7 @@ public class Graph extends AppCompatActivity {
         setContentView(R.layout.activity_graph);
         getSupportActionBar().setDisplayHomeAsUpEnabled(true);
         if (getIntent().hasExtra("all the data")) {
-            doubleData= getIntent().getDoubleArrayExtra("all the data");
+            doubleData = getIntent().getDoubleArrayExtra("all the data");
         } else {
             throw new IllegalArgumentException("Activity cannot find  extras " + "all the data");
         }
@@ -68,7 +68,7 @@ public class Graph extends AppCompatActivity {
         plot.setRangeLabel("Voltage [V]");
         plot.getDomainLabelWidget().pack();
         plot.getRangeLabelWidget().pack();
-        //plot(plot,doubleData);
+        plot(plot,doubleData);
     }
 
 

@@ -46,6 +46,7 @@ public class BluetoothDataDisplayActivity extends ActionBarActivity {
     private TextView peakData;
     private Button analyzeData;
     private Button Graph;
+    private Button historyBtn;
 
     //TESTING (temporary)
     private static int storedPoints = 0;
@@ -57,14 +58,15 @@ public class BluetoothDataDisplayActivity extends ActionBarActivity {
     private BluetoothHelper helper;
 
     private static double[] doubleData;
-
+    private static String storageDirectory;
 
     public static File makeExternalFile(String filename) {
         File file;
         try {
             String state = Environment.getExternalStorageState();
             if (Environment.MEDIA_MOUNTED.equals(state)) {
-                File docsFolder = new File(Environment.getExternalStorageDirectory() + "/NBTA");
+                storageDirectory = Environment.getExternalStorageDirectory().toString() + "/HemoCentric";
+                File docsFolder = new File(storageDirectory);
                 boolean isPresent = true;
                 if (!docsFolder.exists()) {
                     isPresent = docsFolder.mkdir();
@@ -72,7 +74,7 @@ public class BluetoothDataDisplayActivity extends ActionBarActivity {
                 if (isPresent) {
                     file = new File(docsFolder.getAbsolutePath(),filename);
                 } else {
-                    Log.e("BDDA", "Cannot Create Directory in "+Environment.getExternalStorageDirectory()+".");
+                    Log.e("BDDA", "Cannot Create Directory "+ storageDirectory +".");
                     file = null;
                 }
             } else {
@@ -106,11 +108,12 @@ public class BluetoothDataDisplayActivity extends ActionBarActivity {
         //Text fields and buttons
         //inputData = (EditText)findViewById(R.id.input_data_field);
         //displayData = (TextView)findViewById(R.id.display_data_view);
-        sendData = (Button)findViewById(R.id.send_data_btn);
         //pointsData = (TextView)findViewById(R.id.display_points_view);
+        sendData = (Button)findViewById(R.id.send_data_btn);
         peakData = (TextView)findViewById(R.id.display_peaks_view);
         analyzeData = (Button)findViewById(R.id.analyze_btn);
-        Graph = (Button)findViewById((R.id.Graph));
+        Graph = (Button)findViewById(R.id.Graph);
+        historyBtn = (Button)findViewById(R.id.history_btn);
 
 
 
@@ -119,7 +122,7 @@ public class BluetoothDataDisplayActivity extends ActionBarActivity {
         final File file_bytes = makeExternalFile(filename);
         if(file_bytes != null) {
             peakData.setText("Ext. Storage: " + file_bytes.toString());
-        }else peakData.setText("No Ext. Storage.");
+        }else peakData.setText("No Ext. Storage. (necessary to function)");
 
         helper = new BluetoothHelper(BluetoothDataDisplayActivity.this,new BleWrapperUiCallbacks.Null(){
 
@@ -133,6 +136,7 @@ public class BluetoothDataDisplayActivity extends ActionBarActivity {
                String val =  bytesToHex(rawValue);
 
                 Log.d("BDDA", "Notification = " + strValue + " or " + val);
+                Log.e("BDDA", "Notification = " + strValue + " or " + val);
 
                 //TODO: strValue is your data...for right now pretend it's just numbers, in whatever form you want it to be
                 //create a method OUTSIDE the onCreate method, to do your filtering, and another one for peak detection
@@ -141,21 +145,24 @@ public class BluetoothDataDisplayActivity extends ActionBarActivity {
                 BufferedWriter bw;
                 try {
 
-                    // need checks for no ext. storage
-                    bw = new BufferedWriter(new FileWriter(file_bytes, true),1000);
-                    for(byte byt : rawValue){
-                        bw.write((byt & 0xFF) + "\n"); //converts each byte into an unsigned int (0-255)
-                        //updatePlot(RToD(byt & 0xFF));
+                    if(file_bytes != null) {
+                        bw = new BufferedWriter(new FileWriter(file_bytes, true), 1000);
+                        for (byte byt : rawValue) {
+                            bw.write((byt & 0xFF) + "\n"); //converts each byte into an unsigned int (0-255)
+                            //bw.write("60\n");
+                            //updatePlot(RToD(byt & 0xFF));
+                        }
+                        bw.flush();
+                        bw.close();
+                        storedPoints++;
                     }
-                    bw.flush();
-                    bw.close();
-                    storedPoints++;
 
                 }
                 catch (Exception e){
                     e.printStackTrace();
                 }
 
+                /* Doesn't do anything here
                 runOnUiThread(new Runnable(){
                     @Override
                     public void run(){
@@ -163,6 +170,7 @@ public class BluetoothDataDisplayActivity extends ActionBarActivity {
                         //pointsData.setText("approx. Points Received: " + storedPoints*20);
                     }
                 });
+                */
 
 
 
@@ -223,6 +231,7 @@ public class BluetoothDataDisplayActivity extends ActionBarActivity {
                 helper.getSupportedServices();
 
             }
+
             @Override
             public void uiDeviceDisconnected(BluetoothGatt gatt, BluetoothDevice device) {
 
@@ -270,13 +279,14 @@ public class BluetoothDataDisplayActivity extends ActionBarActivity {
         analyzeData.setOnClickListener(new View.OnClickListener(){
             @Override
             public void onClick(View v){
-                String filename = "arddata_raw.txt";
                 double minPeakThreshold = .5;
                 double peakFallRatio = .9;
                 double[] data = null;
+                boolean parse = true;
+                boolean delete = true;
 
 
-                data = parseData(file_bytes, true); //true=delete raw_file every time
+                data = parseData(file_bytes, parse, delete);
                 if(data != null){
                     int numMaxes = newFindPeak(data, minPeakThreshold);
                     /* Old Find Peak
@@ -288,6 +298,7 @@ public class BluetoothDataDisplayActivity extends ActionBarActivity {
                     */
 
                     peakData.setText("Num Peaks Found: " + numMaxes + "\nUsing " + data.length + " received points.");
+                    doubleData = data;
                 }else{
                     peakData.setText("No Data Found");
                 }
@@ -298,16 +309,57 @@ public class BluetoothDataDisplayActivity extends ActionBarActivity {
         //Open the Graph activity
         Graph.setOnClickListener(new View.OnClickListener(){
             public void onClick(View v){
-                Intent intent=new Intent(BluetoothDataDisplayActivity.this,Graph.class);
-                intent.putExtra("all the data",doubleData);
+                Intent intent = new Intent(BluetoothDataDisplayActivity.this, Graph.class);
+                intent.putExtra("all the data", doubleData);
+                startActivity(intent);
+            }
+        });
+
+        //Opens a list of available data sets
+        //TODO: fix the external directory creation process (make ext. file)
+        historyBtn.setOnClickListener(new View.OnClickListener(){
+            public void onClick(View v){
+                Intent intent = new Intent(BluetoothDataDisplayActivity.this, DataHistory.class);
+                intent.putExtra("data_directory", storageDirectory);// will not use yet
                 startActivity(intent);
             }
         });
 
     }
 
+
+    //TODO: not working
+    // opens graph activity with specified double data array
+    public void openGraph(final double[] data){
+        if(data == null){
+            Log.e("BDDA", "Error in openGraph: null data set\n");
+            return;
+        }
+        //Open the Graph activity
+        Graph.setOnClickListener(new View.OnClickListener(){
+            public void onClick(View v){
+                if(doubleData == null) Log.e("BDDA", "doubleData is null when opening graph");
+                Intent intent = new Intent(BluetoothDataDisplayActivity.this, Graph.class);
+                // not sure if this will work
+                intent.putExtra("all the data", doubleData);
+                startActivity(intent);
+            }
+        });
+
+    }
+    // opens with a filename (string) - must be a file of doubles
+    public void openGraph(String datafile){
+        if(datafile == null) return;
+
+        File f = new File(datafile);
+        double[] data = parseData(f, false, false);
+        openGraph(data);
+
+    }
+
     // Lightweight but still a good estimate of peaks.
     // Triggers on the rising and falling edge to detect a peak.
+    // Threshold can be set.
     public static int newFindPeak(double[] data, double threshold){
         boolean aboveThreshold = false;
         int peaksFound = 0;
@@ -324,16 +376,14 @@ public class BluetoothDataDisplayActivity extends ActionBarActivity {
 
     // Converts the int received from the Arduino in to its corresponding double value
     // Maps (0, 255) to (-5, 5)
-    public static double RToD(int raw){
-        return 2.0*((double)raw*(5.0/256)) - 5.0;
-    }
+    public static double RToD(int raw){ return (2.0*((double)raw*(5.0/256)) - 5.0); }
 
     /**
-     * This code works on the complete data-set.
-     * It parses the data from digital(int) -> voltage(double)
-     * It saves the data, and also returns it for use in the app
+     * This code works on a complete data-set.
+     * It can parse the data from digital(int) -> voltage(double)
+     * It returns the data in a double array, and also returns it for use in the app
      */
-    public static double[] parseData(File f, boolean delete){
+    public static double[] parseData(File f, boolean parse, boolean delete){
         // Reading Input, customize according to source
         //return null;
 
@@ -342,7 +392,64 @@ public class BluetoothDataDisplayActivity extends ActionBarActivity {
             FileInputStream fStream;
             BufferedReader bReader = null;
             int points = 0;
+            ArrayList<Number> tempData = new ArrayList<Number>(10000);
 
+            try{
+                fStream = new FileInputStream(f);
+                bReader = new BufferedReader(new InputStreamReader(fStream));
+
+                // Reading ints from file
+                while(bReader.ready()){
+                    if(parse) tempData.add(Integer.parseInt(bReader.readLine()));
+                    else      tempData.add(Double.parseDouble(bReader.readLine()));
+                    points++;
+                }
+            }catch(Exception e){
+                System.out.println("Exception caught in first try/catch");
+                System.out.println(e.getMessage());
+            }finally{
+                try{bReader.close();}
+                catch(Exception ex){/*ignore*/}
+            }
+
+            // converting to the output double[]
+            double[] data = new double[points];
+            if(parse) { // 2.0*((double)tempData[i]*(5.0/256)) - 5.0;
+                for (int i = 0; i < points; i++) data[i] = RToD(tempData.get(i).intValue());
+            }else{
+                for (int i = 0; i < points; i++) data[i] = tempData.get(i).doubleValue();
+            }
+
+            // saving it as a new double text file (and possibly deleting raw)
+            if(parse){ // only need to do this if parsed from raw file
+                //TODO: need to replace with calender (abbas already did this, but where is it?)
+                File file_double = makeExternalFile("arddata_double(" + System.currentTimeMillis() + ").txt");
+                BufferedWriter bw;
+
+                try {
+                    bw = new BufferedWriter(new FileWriter(file_double, true),1000);
+                    for(double d : data){
+                        bw.write(d + "\n");
+                    }
+                    bw.flush();
+                    bw.close();
+                }catch (Exception e){
+                    e.printStackTrace();
+                }finally {
+                    if(delete) f.delete(); //delete the raw data file of ints
+                    //TODO: change arddata_raw file to also have timestamp (for clarity)
+                    else{
+
+                    }
+                }
+            }
+            return data;
+        }else{
+            Log.e("BDDA", "File does not exist.");
+            return null;
+        }
+            // should find a better way to do this
+            /*
             int[] tempData = new int[(int) (f.length()/2)];
             try{
                 fStream = new FileInputStream(f);
@@ -358,10 +465,11 @@ public class BluetoothDataDisplayActivity extends ActionBarActivity {
                 System.out.println(e.getMessage());
             }finally{
                 try{bReader.close();}
-                catch(Exception ex){/*ignore*/}
+                catch(Exception ex){/*ignore/}
             }
 
             // try plotting after
+            // what does this do?
             Number[] numarr = new Number[points];
             for(int i=0; i<points; i++){
                 numarr[i] = tempData[i];
@@ -394,9 +502,10 @@ public class BluetoothDataDisplayActivity extends ActionBarActivity {
             return doubleData;
 
         }else{
-            Log.e("BDDA", f.toString() + " does not exist.");
+            Log.e("BDDA", "File does not exist.");
             return null;
         }
+        */
 
     }
 
