@@ -18,6 +18,11 @@ import android.widget.EditText;
 import android.widget.TextView;
 
 
+import com.androidplot.xy.BarFormatter;
+import com.androidplot.xy.BoundaryMode;
+import com.androidplot.xy.SimpleXYSeries;
+import com.androidplot.xy.XYPlot;
+import com.androidplot.xy.XYStepMode;
 import com.runanobiolab.hemocentric.R;
 import com.runanobiolab.hemocentric.bluetooth.BluetoothHelper;
 import com.runanobiolab.hemocentric.bluetooth.interfaces.BleWrapperUiCallbacks;
@@ -29,7 +34,9 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileWriter;
 import java.io.InputStreamReader;
+import java.text.SimpleDateFormat;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 
 public class BluetoothDataDisplayActivity extends ActionBarActivity {
@@ -47,10 +54,21 @@ public class BluetoothDataDisplayActivity extends ActionBarActivity {
     private Button analyzeData;
     private Button Graph;
     private Button historyBtn;
+    private XYPlot mainPlot;
 
     //TESTING (temporary)
     private static int storedPoints = 0;
-    private final String filename_raw = "arddata_raw.txt";
+    private final String filename = "arddata_raw.txt";
+
+    //for uiNewValueForCharacteristic
+    private static StringBuilder dataStream_sb = new StringBuilder();
+    private static String dataStream = "";
+    private static boolean thresReached = false;
+    private static int numPeaks = 0;
+    private static int numPoints = 0;
+    private static int const_threshold = DToR(.5);
+
+    private static boolean dataIsSavedBeforeRestart = false;
 
     //BLE STUFF
     private BluetoothGattService service;
@@ -60,33 +78,6 @@ public class BluetoothDataDisplayActivity extends ActionBarActivity {
     private static double[] doubleData;
     private static String storageDirectory;
 
-    public static File makeExternalFile(String filename) {
-        File file;
-        try {
-            String state = Environment.getExternalStorageState();
-            if (Environment.MEDIA_MOUNTED.equals(state)) {
-                storageDirectory = Environment.getExternalStorageDirectory().toString() + "/HemoCentric";
-                File docsFolder = new File(storageDirectory);
-                boolean isPresent = true;
-                if (!docsFolder.exists()) {
-                    isPresent = docsFolder.mkdir();
-                }
-                if (isPresent) {
-                    file = new File(docsFolder.getAbsolutePath(),filename);
-                } else {
-                    Log.e("BDDA", "Cannot Create Directory "+ storageDirectory +".");
-                    file = null;
-                }
-            } else {
-                file = null;
-                Log.e("BDDA", "Cannot Create File.");
-            }
-        } catch (Exception e) {
-            e.printStackTrace();
-            file = null;
-        }
-        return file;
-    }
 
     //Function for updating the plot maybe update every 5-10?
     //synchronized
@@ -103,29 +94,50 @@ public class BluetoothDataDisplayActivity extends ActionBarActivity {
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        setContentView(R.layout.activity_bluetooth_data_display);
+        //setContentView(R.layout.activity_bluetooth_data_display);
+        setContentView(R.layout.test_layout);
 
+        /*
         //Text fields and buttons
         //inputData = (EditText)findViewById(R.id.input_data_field);
         //displayData = (TextView)findViewById(R.id.display_data_view);
-        //pointsData = (TextView)findViewById(R.id.display_points_view);
+        pointsData = (TextView)findViewById(R.id.display_points_view);
         sendData = (Button)findViewById(R.id.send_data_btn);
         peakData = (TextView)findViewById(R.id.display_peaks_view);
         analyzeData = (Button)findViewById(R.id.analyze_btn);
         Graph = (Button)findViewById(R.id.Graph);
         historyBtn = (Button)findViewById(R.id.history_btn);
+        */
+
+        //test layout
+        pointsData = (TextView)findViewById(R.id.display_points_view);
+        sendData = (Button)findViewById(R.id.Button_measure);
+        peakData = (TextView)findViewById(R.id.TextView_peak_count);
+        analyzeData = (Button)findViewById(R.id.analyze_btn);
+        Graph = (Button)findViewById(R.id.Graph);
+        historyBtn = (Button)findViewById(R.id.Button_history);
+        mainPlot = (XYPlot)findViewById(R.id.XYPlot_main_plot);
+
+        //setting up graph parameters
+        mainPlot.setDomainBoundaries(-50, 50, BoundaryMode.FIXED);
+        mainPlot.setRangeBoundaries(-5, 5, BoundaryMode.FIXED);
+        mainPlot.getLayoutManager().remove(mainPlot.getLegendWidget()); //removing legend
+        mainPlot.setRangeStep(XYStepMode.INCREMENT_BY_VAL, 1);
+        final BarFormatter bf = new BarFormatter(Color.argb(100,0,200,0), Color.rgb(0, 80, 0));
 
 
-
+        // checking for correct file storage setup
         //TODO: change to one central filename
-        String filename = "arddata_raw.txt";
         final File file_bytes = makeExternalFile(filename);
         if(file_bytes != null) {
             peakData.setText("Ext. Storage: " + file_bytes.toString());
         }else peakData.setText("No Ext. Storage. (necessary to function)");
 
+        // making bluetooth helper
         helper = new BluetoothHelper(BluetoothDataDisplayActivity.this,new BleWrapperUiCallbacks.Null(){
 
+            // previous uiNewValueForCharacteristic function
+            /* TODO: Test changing the uiNewValueForCharacteristic function
             @Override
             public void uiNewValueForCharacteristic(BluetoothGatt gatt,
                                                     BluetoothDevice device, BluetoothGattService service,
@@ -133,10 +145,10 @@ public class BluetoothDataDisplayActivity extends ActionBarActivity {
                                                     byte[] rawValue, String timestamp) {
 
 
-               String val =  bytesToHex(rawValue);
+                String val =  bytesToHex(rawValue);
 
                 Log.d("BDDA", "Notification = " + strValue + " or " + val);
-                Log.e("BDDA", "Notification = " + strValue + " or " + val);
+                //Log.e("BDDA", "Notification = " + strValue + " or " + val);
 
                 //TODO: strValue is your data...for right now pretend it's just numbers, in whatever form you want it to be
                 //create a method OUTSIDE the onCreate method, to do your filtering, and another one for peak detection
@@ -149,7 +161,6 @@ public class BluetoothDataDisplayActivity extends ActionBarActivity {
                         bw = new BufferedWriter(new FileWriter(file_bytes, true), 1000);
                         for (byte byt : rawValue) {
                             bw.write((byt & 0xFF) + "\n"); //converts each byte into an unsigned int (0-255)
-                            //bw.write("60\n");
                             //updatePlot(RToD(byt & 0xFF));
                         }
                         bw.flush();
@@ -161,20 +172,59 @@ public class BluetoothDataDisplayActivity extends ActionBarActivity {
                 catch (Exception e){
                     e.printStackTrace();
                 }
+            }
+            */
 
-                /* Doesn't do anything here
-                runOnUiThread(new Runnable(){
-                    @Override
-                    public void run(){
-                        // should be 20 bytes/packet
-                        //pointsData.setText("approx. Points Received: " + storedPoints*20);
+
+
+            // Called whenever receives a packet notification from the BLE Module, right?
+            // seems to run in a separate thread (not UI)
+            @Override
+            public void uiNewValueForCharacteristic(BluetoothGatt gatt,
+                                                    BluetoothDevice device, BluetoothGattService service,
+                                                    BluetoothGattCharacteristic ch, final String strValue, int intValue,
+                                                    byte[] rawValue, String timestamp) {
+
+               String byteString =  bytesToHex(rawValue);
+                Log.e("BDDA", "Notification(" + rawValue.length + ") = [" + byteString + "]");
+
+                // temporarily storing the points for later saving to text file
+                dataStream_sb.append(byteString);
+                Number[] xpacket = new Number[rawValue.length];
+                Number[] ypacket = new Number[rawValue.length];
+
+                // real-time checking for peaks
+                for(int i=0; i < rawValue.length; i++){
+                    byte byt = rawValue[i];
+                    int val = byt & 0xFF;
+
+                    // get packet for series
+                    xpacket[i] = val;
+                    ypacket[i] = numPoints;
+
+                    // checking whether peak
+                    if(val > const_threshold && !thresReached){
+                        thresReached = true;
+                    }else if(val < const_threshold && thresReached){
+                        thresReached = false;
+                        numPeaks++;
                     }
-                });
-                */
+                    numPoints++;
 
+                }
 
+                Log.e("BDDA", "Peaks: " + numPeaks + "; Points: " + numPoints);
+
+                pointsData.setText("Num Points: " + numPoints);
+
+                //updating graph
+                SimpleXYSeries xyseries1 = new SimpleXYSeries(Arrays.asList(xpacket), Arrays.asList(ypacket), "series1");
+                mainPlot.addSeries(xyseries1, bf);
+                mainPlot.setDomainBoundaries(numPoints - 50, numPoints + 50, BoundaryMode.FIXED);
+                mainPlot.redraw();
 
             }
+
             @Override
             public void uiGotNotification(BluetoothGatt gatt, BluetoothDevice device,
                                           BluetoothGattService service,
@@ -261,20 +311,30 @@ public class BluetoothDataDisplayActivity extends ActionBarActivity {
 
         helper.connect(BLE_MAC_ADDRESS);
 
+        //TODO: disable send for x seconds, also make it reset counters & save data if needed
         sendData.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
 
-                String data = "a"; //sent to the BLE module to start data collection
+                boolean useBLE = true;
+                if(useBLE) {
+                    String data = "a"; //sent to the BLE module to start data collection
 
-                byte[] dataBytes = data.getBytes(); //{(byte)integer};
+                    byte[] dataBytes = data.getBytes(); //{(byte)integer};
 
-                storedPoints = 0;
+                    storedPoints = 0;
 
-                helper.writeDataToCharacteristic(characteristic, dataBytes);
+                    helper.writeDataToCharacteristic(characteristic, dataBytes);
+                    Log.e("BDDA", "Character written to bluetooth");
+                }else { //for testing, create data
+                    createData();
+                    Log.e("BDDA", "Note: USE BLE is off, making test file");
+
+                }
 
             }
         });
+
 
         analyzeData.setOnClickListener(new View.OnClickListener(){
             @Override
@@ -307,13 +367,19 @@ public class BluetoothDataDisplayActivity extends ActionBarActivity {
         });
 
         //Open the Graph activity
+        /*
         Graph.setOnClickListener(new View.OnClickListener(){
             public void onClick(View v){
                 Intent intent = new Intent(BluetoothDataDisplayActivity.this, Graph.class);
-                intent.putExtra("all the data", doubleData);
-                startActivity(intent);
+                if(doubleData != null) {
+                    intent.putExtra("all the data", doubleData);
+                    startActivity(intent);
+                }else{
+                    //TODO: show the last data
+                    Log.e("BDDA", "graph activity error: doubleData is null");
+                }
             }
-        });
+        });*/
 
         //Opens a list of available data sets
         //TODO: fix the external directory creation process (make ext. file)
@@ -327,35 +393,55 @@ public class BluetoothDataDisplayActivity extends ActionBarActivity {
 
     }
 
-
-    //TODO: not working
-    // opens graph activity with specified double data array
-    public void openGraph(final double[] data){
-        if(data == null){
-            Log.e("BDDA", "Error in openGraph: null data set\n");
-            return;
-        }
-        //Open the Graph activity
-        Graph.setOnClickListener(new View.OnClickListener(){
-            public void onClick(View v){
-                if(doubleData == null) Log.e("BDDA", "doubleData is null when opening graph");
-                Intent intent = new Intent(BluetoothDataDisplayActivity.this, Graph.class);
-                // not sure if this will work
-                intent.putExtra("all the data", doubleData);
-                startActivity(intent);
+    public static File makeExternalFile(String filename) {
+        File file;
+        try {
+            String state = Environment.getExternalStorageState();
+            if (Environment.MEDIA_MOUNTED.equals(state)) {
+                storageDirectory = Environment.getExternalStorageDirectory().toString() + "/HemoCentric";
+                File docsFolder = new File(storageDirectory);
+                boolean isPresent = true;
+                if (!docsFolder.exists()) {
+                    isPresent = docsFolder.mkdir();
+                }
+                if (isPresent) {
+                    file = new File(docsFolder.getAbsolutePath(),filename);
+                } else {
+                    Log.e("BDDA", "Cannot Create Directory "+ storageDirectory +".");
+                    file = null;
+                }
+            } else {
+                file = null;
+                Log.e("BDDA", "Cannot Create File.");
             }
-        });
+        } catch (Exception e) {
+            e.printStackTrace();
+            file = null;
+        }
+        return file;
+    }
+
+    public void createData() {
+        BufferedWriter bw;
+        File test_file = makeExternalFile("test_file");
+
+        try {
+            if(test_file != null) {
+                bw = new BufferedWriter(new FileWriter(test_file, true), 1000);
+                for (int i=0; i<1000; i++) {
+                    bw.write((i%130) + "\n"); //converts each byte into an unsigned int (0-255)
+                }
+                bw.flush();
+                bw.close();
+            }
+
+        }
+        catch (Exception e){
+            e.printStackTrace();
+        }
 
     }
-    // opens with a filename (string) - must be a file of doubles
-    public void openGraph(String datafile){
-        if(datafile == null) return;
 
-        File f = new File(datafile);
-        double[] data = parseData(f, false, false);
-        openGraph(data);
-
-    }
 
     // Lightweight but still a good estimate of peaks.
     // Triggers on the rising and falling edge to detect a peak.
@@ -375,8 +461,10 @@ public class BluetoothDataDisplayActivity extends ActionBarActivity {
     }
 
     // Converts the int received from the Arduino in to its corresponding double value
+    // Raw To Double
     // Maps (0, 255) to (-5, 5)
     public static double RToD(int raw){ return (2.0*((double)raw*(5.0/256)) - 5.0); }
+    public static int DToR(double dbl){ return ((int)Math.ceil((dbl + 5) * 256.0 / 5 / 2)); }
 
     /**
      * This code works on a complete data-set.
@@ -422,8 +510,8 @@ public class BluetoothDataDisplayActivity extends ActionBarActivity {
 
             // saving it as a new double text file (and possibly deleting raw)
             if(parse){ // only need to do this if parsed from raw file
-                //TODO: need to replace with calender (abbas already did this, but where is it?)
-                File file_double = makeExternalFile("arddata_double(" + System.currentTimeMillis() + ").txt");
+                String timeStamp = new SimpleDateFormat("yyyy.MM.dd.HH.mm.ss").format(new java.util.Date());
+                File file_double = makeExternalFile(timeStamp + "(double).txt");
                 BufferedWriter bw;
 
                 try {
@@ -436,9 +524,10 @@ public class BluetoothDataDisplayActivity extends ActionBarActivity {
                 }catch (Exception e){
                     e.printStackTrace();
                 }finally {
-                    if(delete) f.delete(); //delete the raw data file of ints
-                    //TODO: change arddata_raw file to also have timestamp (for clarity)
+                    if(delete) f.delete(); //delete the raw data file of int
                     else{
+                        //TODO: change arddata_raw file to also have timestamp (for clarity)
+                        //File rename = new File("");
 
                     }
                 }
@@ -448,64 +537,6 @@ public class BluetoothDataDisplayActivity extends ActionBarActivity {
             Log.e("BDDA", "File does not exist.");
             return null;
         }
-            // should find a better way to do this
-            /*
-            int[] tempData = new int[(int) (f.length()/2)];
-            try{
-                fStream = new FileInputStream(f);
-                bReader = new BufferedReader(new InputStreamReader(fStream));
-
-                // Reading ints from file
-                while(bReader.ready()){
-                    tempData[points] = Integer.parseInt(bReader.readLine());
-                    points++;
-                }
-            }catch(Exception e){
-                System.out.println("Exception caught in first try/catch");
-                System.out.println(e.getMessage());
-            }finally{
-                try{bReader.close();}
-                catch(Exception ex){/*ignore/}
-            }
-
-            // try plotting after
-            // what does this do?
-            Number[] numarr = new Number[points];
-            for(int i=0; i<points; i++){
-                numarr[i] = tempData[i];
-            }
-
-            // Conversion to double
-            doubleData = new double[points];
-            for(int i=0; i<points; i++){
-                doubleData[i] = RToD(tempData[i]); //2.0*((double)tempData[i]*(5.0/256)) - 5.0;
-            }
-
-
-
-            //save as text file
-            File file_double = makeExternalFile("arddata_double_" + System.currentTimeMillis() + ".txt");
-            BufferedWriter bw;
-            try {
-                bw = new BufferedWriter(new FileWriter(file_double, true),1000);
-                for(double d: doubleData){
-                    bw.write(d + "\n");
-                }
-                bw.flush();
-                bw.close();
-            }catch (Exception e){
-                e.printStackTrace();
-            }finally {
-                if(delete) f.delete(); //delete the raw data file of ints
-            }
-
-            return doubleData;
-
-        }else{
-            Log.e("BDDA", "File does not exist.");
-            return null;
-        }
-        */
 
     }
 

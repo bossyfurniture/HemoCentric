@@ -64,6 +64,7 @@ public class Graph extends AppCompatActivity {
         plot.addSeries(liadata, new LineAndPointFormatter(Color.rgb(100, 100, 200), null, null, null));
         plot.setDomainStepValue(11);
         plot.setRangeStep(XYStepMode.INCREMENT_BY_VAL, 1);
+        plot.getLayoutManager().remove(plot.getLegendWidget()); //removing legend
         //plot.setDomainLabel("Sample Index");
         plot.setRangeLabel("Voltage [V]");
         plot.getDomainLabelWidget().pack();

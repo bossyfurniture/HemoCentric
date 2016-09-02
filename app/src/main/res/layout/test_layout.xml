@@ -1,0 +1,88 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:orientation="vertical"
+    android:layout_width="fill_parent"
+    xmlns:tools="http://schemas.android.com/tools"
+    tools:context="com.runanobiolab.hemocentric.activities.BluetoothDataDisplayActivity"
+    android:layout_height="fill_parent">
+
+    <com.androidplot.xy.XYPlot
+        android:id="@+id/XYPlot_main_plot"
+        android:layout_width="fill_parent"
+        android:layout_height="fill_parent"
+        android:layout_weight="1"
+
+        app:label="Live Measurement"
+        app:rangeLabel="range"
+        app:domainLabel="domain"
+
+        app:borderColor="#000000"
+        app:backgroundColor="#FFFFFF"
+        app:graphBackgroundColor="#FFFFFF"
+        app:gridBackgroundColor="#fbf3d5"
+        app:graphDomainLineColor="#d6cc9f"
+        app:graphRangeLineColor="#d6cc9f"
+        app:labelTextColor="#000000"
+
+        app:gridPaddingLeft="10dp"
+        app:gridPaddingRight="10dp"
+        app:gridPaddingTop="10dp"
+        app:gridPaddingBottom="10dp"
+        app:graphMarginTop="20dp"
+        app:graphMarginBottom="40dp"
+        app:graphMarginLeft="15dp"
+        app:graphMarginRight="10dp"
+
+        app:labelTextSize="15sp"
+        app:rangeLabelTextSize="13sp"
+        app:domainLabelTextSize="13sp"
+        app:rangeTickLabelTextSize="10sp"
+        app:rangeOriginTickLabelTextSize="13sp"
+        app:domainTickLabelTextSize="10sp"
+        app:domainOriginTickLabelTextSize="13sp"
+        app:legendTextSize="13sp"
+
+        app:graphDomainLineThickness="1dp"
+        app:graphRangeLineThickness="1dp"
+
+        app:legendIconHeight="15dp"
+        app:legendIconWidth="15dp"
+        app:legendHeight="25dp"
+        app:legendAnchorPosition="right_bottom"/>
+
+    <LinearLayout android:orientation="vertical"
+        android:gravity="center"
+        android:layout_width="fill_parent"
+        android:layout_height="wrap_content">
+
+        <Button android:id="@+id/Button_measure"
+            android:text="Take Measurement"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"/>
+
+        <!-- set font etc. -->
+        <TextView android:id="@+id/TextView_peak_count"
+            android:text="[place-holder]"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"/>
+
+        <Button android:id="@+id/Button_history"
+            android:text="Data History"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"/>
+
+        <!--Temp-->
+        <Button android:id="@+id/analyze_btn"
+            android:text="temp"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"/>
+
+        <TextView android:id="@+id/display_points_view"
+            android:text="[place-holder]"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"/>
+
+    </LinearLayout>
+
+</LinearLayout>
