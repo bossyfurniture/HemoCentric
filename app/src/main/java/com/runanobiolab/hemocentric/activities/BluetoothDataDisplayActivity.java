@@ -18,6 +18,7 @@ import android.widget.EditText;
 import android.widget.TextView;
 
 
+import com.androidplot.util.Redrawer;
 import com.androidplot.xy.BarFormatter;
 import com.androidplot.xy.BoundaryMode;
 import com.androidplot.xy.SimpleXYSeries;
@@ -43,7 +44,8 @@ public class BluetoothDataDisplayActivity extends ActionBarActivity {
 
 
     //private final String BLE_MAC_ADDRESS = "20:C3:8F:D5:35:06"; old BLE Module (broken)
-    private final String BLE_MAC_ADDRESS = "74:DA:EA:B2:67:9A";
+    private final String BLE_MAC_ADDRESS = "74:DA:EA:B2:67:9A"; // HM-10
+    //private final String BLE_MAC_ADDRESS = "00:07:80:D1:26:E3"; // ble112
 
     //UI ELEMENTS
     private EditText inputData;
@@ -69,6 +71,11 @@ public class BluetoothDataDisplayActivity extends ActionBarActivity {
     private static int const_threshold = DToR(.5);
 
     private static boolean dataIsSavedBeforeRestart = false;
+    static boolean b = false;
+    private static ArrayList<Number> XVals;
+    private static ArrayList<Number> YVals;
+    private static SimpleXYSeries xyseries1;
+
 
     //BLE STUFF
     private BluetoothGattService service;
@@ -120,10 +127,12 @@ public class BluetoothDataDisplayActivity extends ActionBarActivity {
 
         //setting up graph parameters
         mainPlot.setDomainBoundaries(-50, 50, BoundaryMode.FIXED);
+        //mainPlot.setDomainBoundaries(0, 100, BoundaryMode.AUTO);
         mainPlot.setRangeBoundaries(-5, 5, BoundaryMode.FIXED);
         mainPlot.getLayoutManager().remove(mainPlot.getLegendWidget()); //removing legend
         mainPlot.setRangeStep(XYStepMode.INCREMENT_BY_VAL, 1);
         final BarFormatter bf = new BarFormatter(Color.argb(100,0,200,0), Color.rgb(0, 80, 0));
+        final Redrawer rd = new Redrawer(mainPlot, (float).25, false);
 
 
         // checking for correct file storage setup
@@ -190,8 +199,11 @@ public class BluetoothDataDisplayActivity extends ActionBarActivity {
 
                 // temporarily storing the points for later saving to text file
                 dataStream_sb.append(byteString);
-                Number[] xpacket = new Number[rawValue.length];
-                Number[] ypacket = new Number[rawValue.length];
+
+                //10->5->2
+                Number[] xpacket = new Number[rawValue.length/4];
+                Number[] ypacket = new Number[rawValue.length/4];
+                int index = 0;
 
                 // real-time checking for peaks
                 for(int i=0; i < rawValue.length; i++){
@@ -199,8 +211,22 @@ public class BluetoothDataDisplayActivity extends ActionBarActivity {
                     int val = byt & 0xFF;
 
                     // get packet for series
-                    xpacket[i] = val;
-                    ypacket[i] = numPoints;
+                    if(i%4 == 1) {
+                        /*
+                        YVals.add(RToD(val));
+                        XVals.add(numPoints);
+                        //xyseries1.addLast(1,RToD(val));
+                        */
+
+                        ypacket[index] = RToD(val);
+                        xpacket[index++] = numPoints;
+                    }
+                    /*
+                    if(XVals.size() > 90){
+                        XVals.remove(0);
+                        YVals.remove(0);
+                    }
+                    */
 
                     // checking whether peak
                     if(val > const_threshold && !thresReached){
@@ -217,11 +243,25 @@ public class BluetoothDataDisplayActivity extends ActionBarActivity {
 
                 pointsData.setText("Num Points: " + numPoints);
 
+
                 //updating graph
                 SimpleXYSeries xyseries1 = new SimpleXYSeries(Arrays.asList(xpacket), Arrays.asList(ypacket), "series1");
                 mainPlot.addSeries(xyseries1, bf);
-                mainPlot.setDomainBoundaries(numPoints - 50, numPoints + 50, BoundaryMode.FIXED);
-                mainPlot.redraw();
+                /*
+                if(xyseries1==null){
+                    xyseries1 = new SimpleXYSeries(XVals, YVals, "series1");
+                    mainPlot.addSeries(xyseries1, bf);
+                }
+                */
+
+                if(b) {
+                    mainPlot.setDomainBoundaries(numPoints - 50, numPoints + 50, BoundaryMode.FIXED);
+                    //mainPlot.redraw();
+                    Log.e("BDDA", "Graph Redrawn");
+                }
+                if(!b) b = true; else b=false;
+
+
 
             }
 
@@ -277,6 +317,7 @@ public class BluetoothDataDisplayActivity extends ActionBarActivity {
             public void uiDeviceConnected(BluetoothGatt gatt, BluetoothDevice device) {
 
                 Log.d("BDDA", "device connected");
+                Log.e("BDDA", "device connected");
 
                 helper.getSupportedServices();
 
@@ -323,9 +364,19 @@ public class BluetoothDataDisplayActivity extends ActionBarActivity {
                     byte[] dataBytes = data.getBytes(); //{(byte)integer};
 
                     storedPoints = 0;
+                    numPeaks = 0;
+                    numPoints = 0;
 
                     helper.writeDataToCharacteristic(characteristic, dataBytes);
-                    Log.e("BDDA", "Character written to bluetooth");
+                    Log.e("BDDA", "Character written to helper");
+
+                    XVals = new ArrayList<Number>(10000);
+                    YVals = new ArrayList<Number>(10000);
+                    //xyseries1 = new SimpleXYSeries(XVals, YVals, "series1");
+                    //mainPlot.addSeries(xyseries1, bf);
+
+                    rd.start();
+
                 }else { //for testing, create data
                     createData();
                     Log.e("BDDA", "Note: USE BLE is off, making test file");
@@ -339,6 +390,11 @@ public class BluetoothDataDisplayActivity extends ActionBarActivity {
         analyzeData.setOnClickListener(new View.OnClickListener(){
             @Override
             public void onClick(View v){
+
+                //temp
+                mainPlot.setDomainBoundaries(numPoints - 50, numPoints + 50, BoundaryMode.FIXED);
+                mainPlot.redraw();
+
                 double minPeakThreshold = .5;
                 double peakFallRatio = .9;
                 double[] data = null;
