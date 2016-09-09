@@ -8,6 +8,7 @@ import android.content.Intent;
 import android.graphics.Color;
 import android.os.Bundle;
 import android.os.Environment;
+import android.os.Looper;
 import android.support.v7.app.ActionBarActivity;
 import android.util.Log;
 import android.view.Menu;
@@ -24,6 +25,13 @@ import com.androidplot.xy.BoundaryMode;
 import com.androidplot.xy.SimpleXYSeries;
 import com.androidplot.xy.XYPlot;
 import com.androidplot.xy.XYStepMode;
+import com.github.mikephil.charting.charts.LineChart;
+import com.github.mikephil.charting.components.YAxis;
+import com.github.mikephil.charting.data.Entry;
+import com.github.mikephil.charting.data.LineData;
+import com.github.mikephil.charting.data.LineDataSet;
+import com.github.mikephil.charting.interfaces.datasets.ILineDataSet;
+import com.github.mikephil.charting.utils.ColorTemplate;
 import com.runanobiolab.hemocentric.R;
 import com.runanobiolab.hemocentric.bluetooth.BluetoothHelper;
 import com.runanobiolab.hemocentric.bluetooth.interfaces.BleWrapperUiCallbacks;
@@ -39,6 +47,7 @@ import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.concurrent.LinkedBlockingQueue;
 
 public class BluetoothDataDisplayActivity extends ActionBarActivity {
 
@@ -57,9 +66,9 @@ public class BluetoothDataDisplayActivity extends ActionBarActivity {
     private Button Graph;
     private Button historyBtn;
     private XYPlot mainPlot;
+    private LineChart rtChart;
 
     //TESTING (temporary)
-    private static int storedPoints = 0;
     private final String filename = "arddata_raw.txt";
 
     //for uiNewValueForCharacteristic
@@ -75,6 +84,7 @@ public class BluetoothDataDisplayActivity extends ActionBarActivity {
     private static ArrayList<Number> XVals;
     private static ArrayList<Number> YVals;
     private static SimpleXYSeries xyseries1;
+    private static LinkedBlockingQueue<Double> lbq;
 
 
     //BLE STUFF
@@ -86,17 +96,6 @@ public class BluetoothDataDisplayActivity extends ActionBarActivity {
     private static String storageDirectory;
 
 
-    //Function for updating the plot maybe update every 5-10?
-    //synchronized
-    /*public void updatePlot(Number val) {
-        if(liadata.size() > SAMPLE_HISTORY){
-            liadata.removeFirst();
-        }
-        liadata.addLast(null, val); //null is the x val, since y-only plot
-        //Log.e("BDDA", liadata.size() + "updated plot " + val);
-
-    }
-    */
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -123,16 +122,25 @@ public class BluetoothDataDisplayActivity extends ActionBarActivity {
         analyzeData = (Button)findViewById(R.id.analyze_btn);
         Graph = (Button)findViewById(R.id.Graph);
         historyBtn = (Button)findViewById(R.id.Button_history);
-        mainPlot = (XYPlot)findViewById(R.id.XYPlot_main_plot);
+        rtChart = (LineChart)findViewById(R.id.LineChart_rtchart);
+
 
         //setting up graph parameters
-        mainPlot.setDomainBoundaries(-50, 50, BoundaryMode.FIXED);
-        //mainPlot.setDomainBoundaries(0, 100, BoundaryMode.AUTO);
-        mainPlot.setRangeBoundaries(-5, 5, BoundaryMode.FIXED);
-        mainPlot.getLayoutManager().remove(mainPlot.getLegendWidget()); //removing legend
-        mainPlot.setRangeStep(XYStepMode.INCREMENT_BY_VAL, 1);
-        final BarFormatter bf = new BarFormatter(Color.argb(100,0,200,0), Color.rgb(0, 80, 0));
-        final Redrawer rd = new Redrawer(mainPlot, (float).25, false);
+        rtChart.setDescription("description");
+        rtChart.setNoDataTextDescription("no data description");
+
+        rtChart.setDragEnabled(true);
+        rtChart.setScaleEnabled(false);
+        rtChart.setDrawGridBackground(false);
+        rtChart.setPinchZoom(false);
+        rtChart.setTouchEnabled(true);
+
+        rtChart.setBackgroundColor(Color.LTGRAY);
+        LineData ld = new LineData();
+        ld.setValueTextColor(Color.WHITE);
+
+
+        rtChart.setData(ld);
 
 
         // checking for correct file storage setup
@@ -145,47 +153,6 @@ public class BluetoothDataDisplayActivity extends ActionBarActivity {
         // making bluetooth helper
         helper = new BluetoothHelper(BluetoothDataDisplayActivity.this,new BleWrapperUiCallbacks.Null(){
 
-            // previous uiNewValueForCharacteristic function
-            /* TODO: Test changing the uiNewValueForCharacteristic function
-            @Override
-            public void uiNewValueForCharacteristic(BluetoothGatt gatt,
-                                                    BluetoothDevice device, BluetoothGattService service,
-                                                    BluetoothGattCharacteristic ch, final String strValue, int intValue,
-                                                    byte[] rawValue, String timestamp) {
-
-
-                String val =  bytesToHex(rawValue);
-
-                Log.d("BDDA", "Notification = " + strValue + " or " + val);
-                //Log.e("BDDA", "Notification = " + strValue + " or " + val);
-
-                //TODO: strValue is your data...for right now pretend it's just numbers, in whatever form you want it to be
-                //create a method OUTSIDE the onCreate method, to do your filtering, and another one for peak detection
-                //then call those methods on this data
-
-                BufferedWriter bw;
-                try {
-
-                    if(file_bytes != null) {
-                        bw = new BufferedWriter(new FileWriter(file_bytes, true), 1000);
-                        for (byte byt : rawValue) {
-                            bw.write((byt & 0xFF) + "\n"); //converts each byte into an unsigned int (0-255)
-                            //updatePlot(RToD(byt & 0xFF));
-                        }
-                        bw.flush();
-                        bw.close();
-                        storedPoints++;
-                    }
-
-                }
-                catch (Exception e){
-                    e.printStackTrace();
-                }
-            }
-            */
-
-
-
             // Called whenever receives a packet notification from the BLE Module, right?
             // seems to run in a separate thread (not UI)
             @Override
@@ -194,39 +161,30 @@ public class BluetoothDataDisplayActivity extends ActionBarActivity {
                                                     BluetoothGattCharacteristic ch, final String strValue, int intValue,
                                                     byte[] rawValue, String timestamp) {
 
-               String byteString =  bytesToHex(rawValue);
-                Log.e("BDDA", "Notification(" + rawValue.length + ") = [" + byteString + "]");
+                boolean b = Looper.myLooper() == Looper.getMainLooper();
+                String byteString =  bytesToHex(rawValue);
+                Log.e("BDDA", b + "Notification(" + rawValue.length + ") = [" + byteString + "]");
 
                 // temporarily storing the points for later saving to text file
                 dataStream_sb.append(byteString);
 
-                //10->5->2
-                Number[] xpacket = new Number[rawValue.length/4];
-                Number[] ypacket = new Number[rawValue.length/4];
-                int index = 0;
+                Number[] packet = new Number[rawValue.length];
 
-                // real-time checking for peaks
+                b = (lbq == null);
+
+                // real-time plotting & checking for peaks
                 for(int i=0; i < rawValue.length; i++){
                     byte byt = rawValue[i];
                     int val = byt & 0xFF;
 
-                    // get packet for series
-                    if(i%4 == 1) {
-                        /*
-                        YVals.add(RToD(val));
-                        XVals.add(numPoints);
-                        //xyseries1.addLast(1,RToD(val));
-                        */
+                    if(!b){
+                        try{
+                            lbq.put((double)val);
+                        }catch(InterruptedException e){
+                            Log.e("Bdda", "Interrupted!");
+                        }
+                    }
 
-                        ypacket[index] = RToD(val);
-                        xpacket[index++] = numPoints;
-                    }
-                    /*
-                    if(XVals.size() > 90){
-                        XVals.remove(0);
-                        YVals.remove(0);
-                    }
-                    */
 
                     // checking whether peak
                     if(val > const_threshold && !thresReached){
@@ -239,27 +197,61 @@ public class BluetoothDataDisplayActivity extends ActionBarActivity {
 
                 }
 
-                Log.e("BDDA", "Peaks: " + numPeaks + "; Points: " + numPoints);
+                runOnUiThread(new Runnable(){
+                    @Override
+                    public void run(){
+                        LineData data = rtChart.getData();
 
-                pointsData.setText("Num Points: " + numPoints);
+                        if (data != null) {
+
+                            ILineDataSet set = data.getDataSetByIndex(0);
+                            // set.addEntry(...); // can be called as well
+
+                            if (set == null) {
+                                set = createSet();
+                                data.addDataSet(set);
+                            }
+
+                            if(lbq.size() > 50) {
+                                updateSet(set);
+                                data.notifyDataChanged();
+
+                                // let the chart know it's data has changed
+                                rtChart.notifyDataSetChanged();
+
+                                // limit the number of visible entries
+                                rtChart.setVisibleXRangeMaximum(120);
+                                // rtChart.setVisibleYRange(30, AxisDependency.LEFT);
+
+                                // move to the latest entry
+                                rtChart.moveViewToX(data.getEntryCount() + 20);
+                                rtChart.invalidate();
+                            }
+                        }else Log.e("BDDA", "Data null");
+
+                        pointsData.setText("Num Points: " + numPoints);
+                    }
+                });
+
+                Log.e("BDDA", "Peaks: " + numPeaks + "; Points: " + numPoints);
+                Log.e("Bdda", "lbq size: " + lbq.size());
+
+                //updating graph
+                //feedMultiple(packet);
+
+                //TODO: implement handler for this
+
 
 
                 //updating graph
-                SimpleXYSeries xyseries1 = new SimpleXYSeries(Arrays.asList(xpacket), Arrays.asList(ypacket), "series1");
-                mainPlot.addSeries(xyseries1, bf);
                 /*
-                if(xyseries1==null){
-                    xyseries1 = new SimpleXYSeries(XVals, YVals, "series1");
-                    mainPlot.addSeries(xyseries1, bf);
-                }
-                */
-
                 if(b) {
                     mainPlot.setDomainBoundaries(numPoints - 50, numPoints + 50, BoundaryMode.FIXED);
                     //mainPlot.redraw();
                     Log.e("BDDA", "Graph Redrawn");
                 }
                 if(!b) b = true; else b=false;
+                */
 
 
 
@@ -352,6 +344,9 @@ public class BluetoothDataDisplayActivity extends ActionBarActivity {
 
         helper.connect(BLE_MAC_ADDRESS);
 
+
+
+
         //TODO: disable send for x seconds, also make it reset counters & save data if needed
         sendData.setOnClickListener(new View.OnClickListener() {
             @Override
@@ -363,19 +358,35 @@ public class BluetoothDataDisplayActivity extends ActionBarActivity {
 
                     byte[] dataBytes = data.getBytes(); //{(byte)integer};
 
-                    storedPoints = 0;
                     numPeaks = 0;
                     numPoints = 0;
+                    lbq = new LinkedBlockingQueue<>();
+
+                    /*
+                    runOnUiThread(new Runnable(){
+                        int counter = 0;
+                        @Override
+                        public void run(){
+                            while(counter < 10) {
+                                if (!lbq.isEmpty()) counter++;
+                                else{
+                                    try{
+                                        double val = lbq.take();
+                                        addEntry(val);
+
+                                    }catch(InterruptedException e){
+                                        //
+                                    }
+
+                                }
+                            }
+                        }
+                    });*/
 
                     helper.writeDataToCharacteristic(characteristic, dataBytes);
                     Log.e("BDDA", "Character written to helper");
 
-                    XVals = new ArrayList<Number>(10000);
-                    YVals = new ArrayList<Number>(10000);
-                    //xyseries1 = new SimpleXYSeries(XVals, YVals, "series1");
-                    //mainPlot.addSeries(xyseries1, bf);
-
-                    rd.start();
+                    //start up graph things
 
                 }else { //for testing, create data
                     createData();
@@ -392,8 +403,10 @@ public class BluetoothDataDisplayActivity extends ActionBarActivity {
             public void onClick(View v){
 
                 //temp
+                /*
                 mainPlot.setDomainBoundaries(numPoints - 50, numPoints + 50, BoundaryMode.FIXED);
                 mainPlot.redraw();
+                */
 
                 double minPeakThreshold = .5;
                 double peakFallRatio = .9;
@@ -417,10 +430,14 @@ public class BluetoothDataDisplayActivity extends ActionBarActivity {
                     doubleData = data;
                 }else{
                     peakData.setText("No Data Found");
+
+                    rtChart.invalidate();
+
                 }
 
             }
         });
+
 
         //Open the Graph activity
         /*
@@ -448,6 +465,152 @@ public class BluetoothDataDisplayActivity extends ActionBarActivity {
         });
 
     }
+
+    private void updateSet(ILineDataSet set){
+        for(int i=0; i<50; i++) {
+            double d = 0;
+            boolean b = false;
+            try {
+                d = lbq.take();
+                b = true;
+            } catch (InterruptedException e) {
+
+            }
+            if(b) set.addEntry(new Entry(set.getEntryCount(),(float)d));
+        }
+
+    }
+
+
+    private LineDataSet createSet() {
+
+        LineDataSet set = new LineDataSet(null, "Dynamic Data");
+        set.setAxisDependency(YAxis.AxisDependency.LEFT);
+        set.setColor(ColorTemplate.getHoloBlue());
+        set.setCircleColor(Color.WHITE);
+        set.setLineWidth(2f);
+        set.setCircleRadius(4f);
+        set.setFillAlpha(65);
+        set.setFillColor(ColorTemplate.getHoloBlue());
+        set.setHighLightColor(Color.rgb(244, 117, 117));
+        set.setValueTextColor(Color.WHITE);
+        set.setValueTextSize(9f);
+        set.setDrawValues(false);
+        return set;
+    }
+
+
+    private void addEntry(Double d){
+
+        LineData data = rtChart.getData();
+
+        if (data != null) {
+
+            ILineDataSet set = data.getDataSetByIndex(0);
+            // set.addEntry(...); // can be called as well
+
+            if (set == null) {
+                set = createSet();
+                data.addDataSet(set);
+            }
+
+            //if(list == null) Log.e("BDDA", "LIST IS NULL");
+            else data.addEntry(new Entry(set.getEntryCount(), d.floatValue()), 0);
+            data.notifyDataChanged();
+
+            // let the chart know it's data has changed
+            rtChart.notifyDataSetChanged();
+
+            // limit the number of visible entries
+            rtChart.setVisibleXRangeMaximum(120);
+            // rtChart.setVisibleYRange(30, AxisDependency.LEFT);
+
+            // move to the latest entry
+            rtChart.moveViewToX(data.getEntryCount()+20);
+
+            // this automatically refreshes the chart (calls invalidate())
+            // rtChart.moveViewTo(data.getXValCount()-7, 55f,
+            // AxisDependency.LEFT);
+        }
+    }
+    private void addEntry(Number[] list){
+
+        LineData data = rtChart.getData();
+
+        if (data != null) {
+
+            ILineDataSet set = data.getDataSetByIndex(0);
+            // set.addEntry(...); // can be called as well
+
+            if (set == null) {
+                set = createSet();
+                data.addDataSet(set);
+            }
+
+            if(list == null) Log.e("BDDA", "LIST IS NULL");
+            else
+            for(Number val : list) {
+                data.addEntry(new Entry(set.getEntryCount(), val.floatValue()), 0);
+            }
+            data.notifyDataChanged();
+
+            // let the chart know it's data has changed
+            rtChart.notifyDataSetChanged();
+
+            // limit the number of visible entries
+            rtChart.setVisibleXRangeMaximum(120);
+            // rtChart.setVisibleYRange(30, AxisDependency.LEFT);
+
+            // move to the latest entry
+            rtChart.moveViewToX(data.getEntryCount()+20);
+
+            // this automatically refreshes the chart (calls invalidate())
+            // rtChart.moveViewTo(data.getXValCount()-7, 55f,
+            // AxisDependency.LEFT);
+        }
+    }
+
+    private Thread thread;
+    private void feedMultiple(Number[] arr) {
+
+        final Number[] list = arr;
+
+        if (thread != null)
+            thread.interrupt();
+
+        final myRunnable runnable = new myRunnable(list) {
+
+            /*
+            @Override
+            public void run() {
+                addEntry(list);
+            }
+            */
+        };
+
+        thread = new Thread(new Runnable() {
+
+            @Override
+            public void run() {
+
+                // Don't generate garbage runnables inside the loop.
+                runOnUiThread(runnable);
+
+
+                try {
+                    //Thread.sleep(25);
+                    Thread.sleep(10);
+                } catch (InterruptedException e) {
+                    // TODO Auto-generated catch block
+                    e.printStackTrace();
+                }
+
+            }
+        });
+
+        thread.start();
+    }
+
 
     public static File makeExternalFile(String filename) {
         File file;
@@ -773,5 +936,28 @@ public class BluetoothDataDisplayActivity extends ActionBarActivity {
         return numMaxes;
     }
     */
+
+}
+
+class myRunnable2 implements Runnable{
+    private double param;
+
+    public myRunnable2(double param){
+        this.param = param;
+    }
+
+    @Override
+    public void run(){}
+
+}
+class myRunnable implements Runnable{
+    private Number[] param;
+
+    public myRunnable(Number[] param){
+        this.param = param;
+    }
+
+    @Override
+    public void run(){}
 
 }

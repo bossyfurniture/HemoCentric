@@ -7,6 +7,7 @@
     tools:context="com.runanobiolab.hemocentric.activities.BluetoothDataDisplayActivity"
     android:layout_height="fill_parent">
 
+    <!--
     <com.androidplot.xy.XYPlot
         android:id="@+id/XYPlot_main_plot"
         android:layout_width="fill_parent"
@@ -50,6 +51,13 @@
         app:legendIconWidth="15dp"
         app:legendHeight="25dp"
         app:legendAnchorPosition="right_bottom"/>
+        -->
+
+    <com.github.mikephil.charting.charts.LineChart
+        android:id="@+id/LineChart_rtchart"
+        android:layout_weight="1"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"/>
 
     <LinearLayout android:orientation="vertical"
         android:gravity="center"
