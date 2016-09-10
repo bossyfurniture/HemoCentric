@@ -8,24 +8,18 @@ import android.content.Intent;
 import android.graphics.Color;
 import android.os.Bundle;
 import android.os.Environment;
-import android.os.Looper;
 import android.support.v7.app.ActionBarActivity;
 import android.util.Log;
 import android.view.Menu;
 import android.view.MenuItem;
 import android.view.View;
 import android.widget.Button;
-import android.widget.EditText;
 import android.widget.TextView;
 
 
-import com.androidplot.util.Redrawer;
-import com.androidplot.xy.BarFormatter;
-import com.androidplot.xy.BoundaryMode;
-import com.androidplot.xy.SimpleXYSeries;
 import com.androidplot.xy.XYPlot;
-import com.androidplot.xy.XYStepMode;
 import com.github.mikephil.charting.charts.LineChart;
+import com.github.mikephil.charting.components.LimitLine;
 import com.github.mikephil.charting.components.YAxis;
 import com.github.mikephil.charting.data.Entry;
 import com.github.mikephil.charting.data.LineData;
@@ -45,7 +39,6 @@ import java.io.FileWriter;
 import java.io.InputStreamReader;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.List;
 import java.util.concurrent.LinkedBlockingQueue;
 
@@ -57,8 +50,6 @@ public class BluetoothDataDisplayActivity extends ActionBarActivity {
     //private final String BLE_MAC_ADDRESS = "00:07:80:D1:26:E3"; // ble112
 
     //UI ELEMENTS
-    private EditText inputData;
-    private TextView displayData;
     private Button sendData;
     private TextView pointsData;
     private TextView peakData;
@@ -71,84 +62,74 @@ public class BluetoothDataDisplayActivity extends ActionBarActivity {
     //TESTING (temporary)
     private final String filename = "arddata_raw.txt";
 
-    //for uiNewValueForCharacteristic
+    //internal data structures/variables
     private static StringBuilder dataStream_sb = new StringBuilder();
-    private static String dataStream = "";
-    private static boolean thresReached = false;
     private static int numPeaks = 0;
     private static int numPoints = 0;
-    private static int const_threshold = DToR(.5);
-
+    private static boolean thresReached = false;
+    private static double const_threshold = .5; //voltage threshold
     private static boolean dataIsSavedBeforeRestart = false;
-    static boolean b = false;
-    private static ArrayList<Number> XVals;
-    private static ArrayList<Number> YVals;
-    private static SimpleXYSeries xyseries1;
     private static LinkedBlockingQueue<Double> lbq;
-
+    private static double[] doubleData;
+    private static String storageDirectory;
+    private static final int queueRefreshThreshold = 50;
+    private static final int plotEveryXPoints = 1; //not implemented
 
     //BLE STUFF
     private BluetoothGattService service;
     private BluetoothGattCharacteristic characteristic;
     private BluetoothHelper helper;
 
-    private static double[] doubleData;
-    private static String storageDirectory;
-
-
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        //setContentView(R.layout.activity_bluetooth_data_display);
-        setContentView(R.layout.test_layout);
+        setContentView(R.layout.activity_bluetooth_data_display);
 
-        /*
-        //Text fields and buttons
-        //inputData = (EditText)findViewById(R.id.input_data_field);
-        //displayData = (TextView)findViewById(R.id.display_data_view);
-        pointsData = (TextView)findViewById(R.id.display_points_view);
-        sendData = (Button)findViewById(R.id.send_data_btn);
-        peakData = (TextView)findViewById(R.id.display_peaks_view);
-        analyzeData = (Button)findViewById(R.id.analyze_btn);
-        Graph = (Button)findViewById(R.id.Graph);
-        historyBtn = (Button)findViewById(R.id.history_btn);
-        */
-
-        //test layout
-        pointsData = (TextView)findViewById(R.id.display_points_view);
+        //mapping ui elements
+        pointsData = (TextView)findViewById(R.id.TextView_point_count);
         sendData = (Button)findViewById(R.id.Button_measure);
         peakData = (TextView)findViewById(R.id.TextView_peak_count);
         analyzeData = (Button)findViewById(R.id.analyze_btn);
         Graph = (Button)findViewById(R.id.Graph);
         historyBtn = (Button)findViewById(R.id.Button_history);
+
+        //setting up graph & parameters
         rtChart = (LineChart)findViewById(R.id.LineChart_rtchart);
+        rtChart.setDescription("Real-Time Data Display");
+        rtChart.setNoDataTextDescription("No Data");
 
-
-        //setting up graph parameters
-        rtChart.setDescription("description");
-        rtChart.setNoDataTextDescription("no data description");
-
+        rtChart.setTouchEnabled(true);
         rtChart.setDragEnabled(true);
         rtChart.setScaleEnabled(false);
         rtChart.setDrawGridBackground(false);
         rtChart.setPinchZoom(false);
-        rtChart.setTouchEnabled(true);
-
+        rtChart.setScaleYEnabled(false);
         rtChart.setBackgroundColor(Color.LTGRAY);
+
+        rtChart.getAxisLeft().setAxisMaxValue(5f);
+        rtChart.getAxisLeft().setAxisMinValue(-5f);
+        rtChart.getAxisRight().setAxisMaxValue(5f);
+        rtChart.getAxisRight().setAxisMinValue(-5f);
+        LimitLine ll = new LimitLine(.5f, "Peak Threshold");
+        ll.setLineColor(Color.RED);
+        ll.setLineWidth(1f);
+        ll.setTextColor(Color.BLACK);
+        ll.setTextSize(12f);
+        rtChart.getAxisLeft().addLimitLine(ll);
+
         LineData ld = new LineData();
-        ld.setValueTextColor(Color.WHITE);
-
-
+        ld.setValueTextColor(Color.GREEN);
         rtChart.setData(ld);
 
 
         // checking for correct file storage setup
         //TODO: change to one central filename
+        //TODO: change peakdata to something else or remove
         final File file_bytes = makeExternalFile(filename);
         if(file_bytes != null) {
-            peakData.setText("Ext. Storage: " + file_bytes.toString());
-        }else peakData.setText("No Ext. Storage. (necessary to function)");
+            //peakData.setText("Ext. Storage: " + file_bytes.toString());
+        }else Log.e("BDDA","No Ext. Storage!");//peakData.setText("No Ext. Storage. (necessary to function)");
 
         // making bluetooth helper
         helper = new BluetoothHelper(BluetoothDataDisplayActivity.this,new BleWrapperUiCallbacks.Null(){
@@ -161,29 +142,27 @@ public class BluetoothDataDisplayActivity extends ActionBarActivity {
                                                     BluetoothGattCharacteristic ch, final String strValue, int intValue,
                                                     byte[] rawValue, String timestamp) {
 
-                boolean b = Looper.myLooper() == Looper.getMainLooper();
+                //A string representation of the hex bytes
                 String byteString =  bytesToHex(rawValue);
-                Log.e("BDDA", b + "Notification(" + rawValue.length + ") = [" + byteString + "]");
+                Log.d("BDDA", "Notification(" + rawValue.length + ") = [" + byteString + "]");
 
                 // temporarily storing the points for later saving to text file
-                dataStream_sb.append(byteString);
+                if(dataStream_sb != null) dataStream_sb.append(byteString);
 
-                Number[] packet = new Number[rawValue.length];
-
-                b = (lbq == null);
 
                 // real-time plotting & checking for peaks
+                boolean Q = (lbq == null);
                 for(int i=0; i < rawValue.length; i++){
                     byte byt = rawValue[i];
-                    int val = byt & 0xFF;
+                    double val = RToD(byt & 0xFF);
 
-                    if(!b){
+                    if(!Q){
                         try{
-                            lbq.put((double)val);
+                            lbq.put(val);
                         }catch(InterruptedException e){
-                            Log.e("Bdda", "Interrupted!");
+                            Log.e("BDDA_notif", "Interrupted!");
                         }
-                    }
+                    }else Log.e("BDDA_notif", "Q is null");
 
 
                     // checking whether peak
@@ -197,63 +176,43 @@ public class BluetoothDataDisplayActivity extends ActionBarActivity {
 
                 }
 
-                runOnUiThread(new Runnable(){
+                runOnUiThread(new Runnable() {
                     @Override
-                    public void run(){
-                        LineData data = rtChart.getData();
+                    public void run() {
+                        LineData data = rtChart.getData(); //getting all chart datasets
 
                         if (data != null) {
 
-                            ILineDataSet set = data.getDataSetByIndex(0);
-                            // set.addEntry(...); // can be called as well
+                            ILineDataSet set = data.getDataSetByIndex(0); //getting first data set
 
-                            if (set == null) {
+                            if (set == null) { //first time, init dataset
                                 set = createSet();
                                 data.addDataSet(set);
                             }
 
-                            if(lbq.size() > 50) {
-                                updateSet(set);
-                                data.notifyDataChanged();
+                            if (lbq.size() > queueRefreshThreshold) { //threshold for updating graph
+                                updateSet(set); //adds points to set
 
                                 // let the chart know it's data has changed
+                                data.notifyDataChanged();
                                 rtChart.notifyDataSetChanged();
 
                                 // limit the number of visible entries
-                                rtChart.setVisibleXRangeMaximum(120);
-                                // rtChart.setVisibleYRange(30, AxisDependency.LEFT);
+                                //increasing lowers performance
+                                rtChart.setVisibleXRangeMaximum(1000);
 
                                 // move to the latest entry
-                                rtChart.moveViewToX(data.getEntryCount() + 20);
-                                rtChart.invalidate();
+                                rtChart.moveViewToX(data.getEntryCount());
+                                rtChart.invalidate(); //updates chart
                             }
-                        }else Log.e("BDDA", "Data null");
+                        } else Log.e("BDDA_notif", "Line Chart data null");
 
                         pointsData.setText("Num Points: " + numPoints);
+                        peakData.setText("Num Peaks: " + numPeaks);
                     }
-                });
+                }); //end runOnUiThread
 
-                Log.e("BDDA", "Peaks: " + numPeaks + "; Points: " + numPoints);
-                Log.e("Bdda", "lbq size: " + lbq.size());
-
-                //updating graph
-                //feedMultiple(packet);
-
-                //TODO: implement handler for this
-
-
-
-                //updating graph
-                /*
-                if(b) {
-                    mainPlot.setDomainBoundaries(numPoints - 50, numPoints + 50, BoundaryMode.FIXED);
-                    //mainPlot.redraw();
-                    Log.e("BDDA", "Graph Redrawn");
-                }
-                if(!b) b = true; else b=false;
-                */
-
-
+                Log.d("BDDA", "Peaks: " + numPeaks + "; Points: " + numPoints+ "; QSize: " + lbq.size());
 
             }
 
@@ -309,7 +268,7 @@ public class BluetoothDataDisplayActivity extends ActionBarActivity {
             public void uiDeviceConnected(BluetoothGatt gatt, BluetoothDevice device) {
 
                 Log.d("BDDA", "device connected");
-                Log.e("BDDA", "device connected");
+                //Log.e("BDDA", "device connected");
 
                 helper.getSupportedServices();
 
@@ -358,37 +317,19 @@ public class BluetoothDataDisplayActivity extends ActionBarActivity {
 
                     byte[] dataBytes = data.getBytes(); //{(byte)integer};
 
+                    // initializing structures for data measurement
+                    if(rtChart!= null && rtChart.getData()!=null)
+                        rtChart.getData().clearValues(); //clear data
                     numPeaks = 0;
                     numPoints = 0;
                     lbq = new LinkedBlockingQueue<>();
+                    dataStream_sb = new StringBuilder(); //TODO: need to save data
 
-                    /*
-                    runOnUiThread(new Runnable(){
-                        int counter = 0;
-                        @Override
-                        public void run(){
-                            while(counter < 10) {
-                                if (!lbq.isEmpty()) counter++;
-                                else{
-                                    try{
-                                        double val = lbq.take();
-                                        addEntry(val);
-
-                                    }catch(InterruptedException e){
-                                        //
-                                    }
-
-                                }
-                            }
-                        }
-                    });*/
-
+                    //sending something to BT to begin measurement
                     helper.writeDataToCharacteristic(characteristic, dataBytes);
-                    Log.e("BDDA", "Character written to helper");
+                    Log.d("BDDA", "Sent notification to bluetooth");
 
-                    //start up graph things
-
-                }else { //for testing, create data
+                }else { //for testing, create some data (does not do anything)
                     createData();
                     Log.e("BDDA", "Note: USE BLE is off, making test file");
 
@@ -401,12 +342,6 @@ public class BluetoothDataDisplayActivity extends ActionBarActivity {
         analyzeData.setOnClickListener(new View.OnClickListener(){
             @Override
             public void onClick(View v){
-
-                //temp
-                /*
-                mainPlot.setDomainBoundaries(numPoints - 50, numPoints + 50, BoundaryMode.FIXED);
-                mainPlot.redraw();
-                */
 
                 double minPeakThreshold = .5;
                 double peakFallRatio = .9;
@@ -467,7 +402,7 @@ public class BluetoothDataDisplayActivity extends ActionBarActivity {
     }
 
     private void updateSet(ILineDataSet set){
-        for(int i=0; i<50; i++) {
+        for(int i=0; i<queueRefreshThreshold; i++) {
             double d = 0;
             boolean b = false;
             try {
@@ -482,14 +417,15 @@ public class BluetoothDataDisplayActivity extends ActionBarActivity {
     }
 
 
+    //change the appearance of the dataset
     private LineDataSet createSet() {
 
         LineDataSet set = new LineDataSet(null, "Dynamic Data");
         set.setAxisDependency(YAxis.AxisDependency.LEFT);
         set.setColor(ColorTemplate.getHoloBlue());
-        set.setCircleColor(Color.WHITE);
+        //set.setCircleColor(Color.WHITE);
         set.setLineWidth(2f);
-        set.setCircleRadius(4f);
+        set.setCircleRadius(1f);
         set.setFillAlpha(65);
         set.setFillColor(ColorTemplate.getHoloBlue());
         set.setHighLightColor(Color.rgb(244, 117, 117));
@@ -498,119 +434,6 @@ public class BluetoothDataDisplayActivity extends ActionBarActivity {
         set.setDrawValues(false);
         return set;
     }
-
-
-    private void addEntry(Double d){
-
-        LineData data = rtChart.getData();
-
-        if (data != null) {
-
-            ILineDataSet set = data.getDataSetByIndex(0);
-            // set.addEntry(...); // can be called as well
-
-            if (set == null) {
-                set = createSet();
-                data.addDataSet(set);
-            }
-
-            //if(list == null) Log.e("BDDA", "LIST IS NULL");
-            else data.addEntry(new Entry(set.getEntryCount(), d.floatValue()), 0);
-            data.notifyDataChanged();
-
-            // let the chart know it's data has changed
-            rtChart.notifyDataSetChanged();
-
-            // limit the number of visible entries
-            rtChart.setVisibleXRangeMaximum(120);
-            // rtChart.setVisibleYRange(30, AxisDependency.LEFT);
-
-            // move to the latest entry
-            rtChart.moveViewToX(data.getEntryCount()+20);
-
-            // this automatically refreshes the chart (calls invalidate())
-            // rtChart.moveViewTo(data.getXValCount()-7, 55f,
-            // AxisDependency.LEFT);
-        }
-    }
-    private void addEntry(Number[] list){
-
-        LineData data = rtChart.getData();
-
-        if (data != null) {
-
-            ILineDataSet set = data.getDataSetByIndex(0);
-            // set.addEntry(...); // can be called as well
-
-            if (set == null) {
-                set = createSet();
-                data.addDataSet(set);
-            }
-
-            if(list == null) Log.e("BDDA", "LIST IS NULL");
-            else
-            for(Number val : list) {
-                data.addEntry(new Entry(set.getEntryCount(), val.floatValue()), 0);
-            }
-            data.notifyDataChanged();
-
-            // let the chart know it's data has changed
-            rtChart.notifyDataSetChanged();
-
-            // limit the number of visible entries
-            rtChart.setVisibleXRangeMaximum(120);
-            // rtChart.setVisibleYRange(30, AxisDependency.LEFT);
-
-            // move to the latest entry
-            rtChart.moveViewToX(data.getEntryCount()+20);
-
-            // this automatically refreshes the chart (calls invalidate())
-            // rtChart.moveViewTo(data.getXValCount()-7, 55f,
-            // AxisDependency.LEFT);
-        }
-    }
-
-    private Thread thread;
-    private void feedMultiple(Number[] arr) {
-
-        final Number[] list = arr;
-
-        if (thread != null)
-            thread.interrupt();
-
-        final myRunnable runnable = new myRunnable(list) {
-
-            /*
-            @Override
-            public void run() {
-                addEntry(list);
-            }
-            */
-        };
-
-        thread = new Thread(new Runnable() {
-
-            @Override
-            public void run() {
-
-                // Don't generate garbage runnables inside the loop.
-                runOnUiThread(runnable);
-
-
-                try {
-                    //Thread.sleep(25);
-                    Thread.sleep(10);
-                } catch (InterruptedException e) {
-                    // TODO Auto-generated catch block
-                    e.printStackTrace();
-                }
-
-            }
-        });
-
-        thread.start();
-    }
-
 
     public static File makeExternalFile(String filename) {
         File file;
