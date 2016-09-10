@@ -39,7 +39,7 @@ public class DataHistory extends AppCompatActivity {
             public void onItemClick(AdapterView<?> adapterView, View view, int selected, long id) {
                 Log.e("BDDA", "Item Clicked: " + selected);
                 // start the graph activity with the selected data
-                Intent intent = new Intent(DataHistory.this, Graph.class);
+                Intent intent = new Intent(DataHistory.this, Graph2.class);
                 double[] dataset = BluetoothDataDisplayActivity.parseData(filearr[selected], false, false);
                 intent.putExtra("all the data", dataset);
                 startActivity(intent);

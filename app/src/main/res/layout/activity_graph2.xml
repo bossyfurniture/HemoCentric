@@ -1,0 +1,52 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:orientation="vertical"
+    android:layout_width="fill_parent"
+    xmlns:tools="http://schemas.android.com/tools"
+    tools:context="com.runanobiolab.hemocentric.activities.Graph2"
+    android:layout_height="fill_parent">
+
+    <TextView
+        android:layout_height="wrap_content"
+        android:layout_width="wrap_content"
+        android:layout_gravity="center"
+        android:gravity="center"
+        android:text="Graph can be zoomed and dragged"
+        />
+
+    <com.github.mikephil.charting.charts.LineChart
+        android:id="@+id/LineChart_historychart"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:layout_weight="1"
+        />
+
+    <LinearLayout android:orientation="vertical"
+        android:gravity="center"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content">
+
+
+        <!-- set font etc. -->
+        <TableLayout
+            android:stretchColumns="1"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent">
+
+            <TableRow>
+                <TextView android:id="@+id/TextView_history_pts"
+                    android:text="[place-holder_points]"
+                    android:padding="3dip"
+                    />
+
+                <TextView android:id="@+id/TextView_history_pks"
+                    android:text="[place-holder_peaks]"
+                    android:padding="3dip"
+                    android:gravity="right"
+                    />
+            </TableRow>
+        </TableLayout>
+
+    </LinearLayout>
+
+</LinearLayout>

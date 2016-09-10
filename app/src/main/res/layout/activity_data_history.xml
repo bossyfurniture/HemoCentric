@@ -5,6 +5,26 @@
     android:orientation="vertical"
     tools:context=".ListActivity" >
 
+    <RelativeLayout
+        android:orientation="vertical"
+        android:layout_height="wrap_content"
+        android:layout_width="match_parent">
+
+        <com.github.mikephil.charting.charts.LineChart
+            android:id="@+id/LineChart_summary_statistics"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            />
+
+        <TextView
+            android:text="Select a previous measurement below to view"
+            android:gravity="center"
+            android:layout_below="@+id/LineChart_summary_statistics"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content" />
+
+    </RelativeLayout>
+
     <ListView
         android:id="@+id/mobile_list"
         android:layout_width="match_parent"

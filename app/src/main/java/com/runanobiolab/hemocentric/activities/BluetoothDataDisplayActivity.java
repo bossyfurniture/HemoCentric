@@ -17,7 +17,6 @@ import android.widget.Button;
 import android.widget.TextView;
 
 
-import com.androidplot.xy.XYPlot;
 import com.github.mikephil.charting.charts.LineChart;
 import com.github.mikephil.charting.components.LimitLine;
 import com.github.mikephil.charting.components.YAxis;
@@ -53,10 +52,8 @@ public class BluetoothDataDisplayActivity extends ActionBarActivity {
     private Button sendData;
     private TextView pointsData;
     private TextView peakData;
-    private Button analyzeData;
     private Button Graph;
     private Button historyBtn;
-    private XYPlot mainPlot;
     private LineChart rtChart;
 
     //TESTING (temporary)
@@ -70,7 +67,6 @@ public class BluetoothDataDisplayActivity extends ActionBarActivity {
     private static double const_threshold = .5; //voltage threshold
     private static boolean dataIsSavedBeforeRestart = false;
     private static LinkedBlockingQueue<Double> lbq;
-    private static double[] doubleData;
     private static String storageDirectory;
     private static final int queueRefreshThreshold = 50;
     private static final int plotEveryXPoints = 1; //not implemented
@@ -90,7 +86,6 @@ public class BluetoothDataDisplayActivity extends ActionBarActivity {
         pointsData = (TextView)findViewById(R.id.TextView_point_count);
         sendData = (Button)findViewById(R.id.Button_measure);
         peakData = (TextView)findViewById(R.id.TextView_peak_count);
-        analyzeData = (Button)findViewById(R.id.analyze_btn);
         Graph = (Button)findViewById(R.id.Graph);
         historyBtn = (Button)findViewById(R.id.Button_history);
 
@@ -101,10 +96,10 @@ public class BluetoothDataDisplayActivity extends ActionBarActivity {
 
         rtChart.setTouchEnabled(true);
         rtChart.setDragEnabled(true);
-        rtChart.setScaleEnabled(false);
-        rtChart.setDrawGridBackground(false);
-        rtChart.setPinchZoom(false);
+        //rtChart.setScaleEnabled(false);
+        rtChart.setPinchZoom(true);
         rtChart.setScaleYEnabled(false);
+        rtChart.setDrawGridBackground(true);
         rtChart.setBackgroundColor(Color.LTGRAY);
 
         rtChart.getAxisLeft().setAxisMaxValue(5f);
@@ -119,7 +114,6 @@ public class BluetoothDataDisplayActivity extends ActionBarActivity {
         rtChart.getAxisLeft().addLimitLine(ll);
 
         LineData ld = new LineData();
-        ld.setValueTextColor(Color.GREEN);
         rtChart.setData(ld);
 
 
@@ -166,9 +160,8 @@ public class BluetoothDataDisplayActivity extends ActionBarActivity {
 
 
                     // checking whether peak
-                    if(val > const_threshold && !thresReached){
-                        thresReached = true;
-                    }else if(val < const_threshold && thresReached){
+                    if(val > const_threshold && !thresReached) thresReached = true;
+                    else if(val < const_threshold && thresReached){
                         thresReached = false;
                         numPeaks++;
                     }
@@ -203,7 +196,7 @@ public class BluetoothDataDisplayActivity extends ActionBarActivity {
 
                                 // move to the latest entry
                                 rtChart.moveViewToX(data.getEntryCount());
-                                rtChart.invalidate(); //updates chart
+                                //rtChart.invalidate(); //updates chart
                             }
                         } else Log.e("BDDA_notif", "Line Chart data null");
 
@@ -339,62 +332,12 @@ public class BluetoothDataDisplayActivity extends ActionBarActivity {
         });
 
 
-        analyzeData.setOnClickListener(new View.OnClickListener(){
-            @Override
-            public void onClick(View v){
-
-                double minPeakThreshold = .5;
-                double peakFallRatio = .9;
-                double[] data = null;
-                boolean parse = true;
-                boolean delete = true;
-
-
-                data = parseData(file_bytes, parse, delete);
-                if(data != null){
-                    int numMaxes = newFindPeak(data, minPeakThreshold);
-                    /* Old Find Peak
-                    double[] smoothed;
-                    smoothed = filterData(detrend(data));
-                    smoothed = filterData(data);
-                    boolean[] isPeak = findPeaks(smoothed, minPeakThreshold, peakFallRatio);
-                    int numMaxes = countPeaks(isPeak);
-                    */
-
-                    peakData.setText("Num Peaks Found: " + numMaxes + "\nUsing " + data.length + " received points.");
-                    doubleData = data;
-                }else{
-                    peakData.setText("No Data Found");
-
-                    rtChart.invalidate();
-
-                }
-
-            }
-        });
-
-
-        //Open the Graph activity
-        /*
-        Graph.setOnClickListener(new View.OnClickListener(){
-            public void onClick(View v){
-                Intent intent = new Intent(BluetoothDataDisplayActivity.this, Graph.class);
-                if(doubleData != null) {
-                    intent.putExtra("all the data", doubleData);
-                    startActivity(intent);
-                }else{
-                    //TODO: show the last data
-                    Log.e("BDDA", "graph activity error: doubleData is null");
-                }
-            }
-        });*/
-
         //Opens a list of available data sets
         //TODO: fix the external directory creation process (make ext. file)
         historyBtn.setOnClickListener(new View.OnClickListener(){
             public void onClick(View v){
                 Intent intent = new Intent(BluetoothDataDisplayActivity.this, DataHistory.class);
-                intent.putExtra("data_directory", storageDirectory);// will not use yet
+                //intent.putExtra("data_directory", storageDirectory);// will not use yet
                 startActivity(intent);
             }
         });
@@ -409,6 +352,7 @@ public class BluetoothDataDisplayActivity extends ActionBarActivity {
                 d = lbq.take();
                 b = true;
             } catch (InterruptedException e) {
+                Log.e("BDDA_updateSet", "Interrupted");
 
             }
             if(b) set.addEntry(new Entry(set.getEntryCount(),(float)d));
@@ -417,7 +361,7 @@ public class BluetoothDataDisplayActivity extends ActionBarActivity {
     }
 
 
-    //change the appearance of the dataset
+    //create/change the appearance of the data set
     private LineDataSet createSet() {
 
         LineDataSet set = new LineDataSet(null, "Dynamic Data");
@@ -463,6 +407,7 @@ public class BluetoothDataDisplayActivity extends ActionBarActivity {
         return file;
     }
 
+    //TODO: try starting a thread that calls uiNewValueForCharacteristic
     public void createData() {
         BufferedWriter bw;
         File test_file = makeExternalFile("test_file");
@@ -488,7 +433,7 @@ public class BluetoothDataDisplayActivity extends ActionBarActivity {
     // Lightweight but still a good estimate of peaks.
     // Triggers on the rising and falling edge to detect a peak.
     // Threshold can be set.
-    public static int newFindPeak(double[] data, double threshold){
+    public static int findPeaksByThreshold(double[] data, double threshold){
         boolean aboveThreshold = false;
         int peaksFound = 0;
 
@@ -502,9 +447,12 @@ public class BluetoothDataDisplayActivity extends ActionBarActivity {
         return peaksFound;
     }
 
-    // Converts the int received from the Arduino in to its corresponding double value
-    // Raw To Double
-    // Maps (0, 255) to (-5, 5)
+    /**
+     * Converts the int received from the Arduino in to its corresponding double value
+     * Raw To Double
+     * Maps (0, 255) to (-5, 5)
+     *
+     */
     public static double RToD(int raw){ return (2.0*((double)raw*(5.0/256)) - 5.0); }
     public static int DToR(double dbl){ return ((int)Math.ceil((dbl + 5) * 256.0 / 5 / 2)); }
 
@@ -759,28 +707,5 @@ public class BluetoothDataDisplayActivity extends ActionBarActivity {
         return numMaxes;
     }
     */
-
-}
-
-class myRunnable2 implements Runnable{
-    private double param;
-
-    public myRunnable2(double param){
-        this.param = param;
-    }
-
-    @Override
-    public void run(){}
-
-}
-class myRunnable implements Runnable{
-    private Number[] param;
-
-    public myRunnable(Number[] param){
-        this.param = param;
-    }
-
-    @Override
-    public void run(){}
 
 }

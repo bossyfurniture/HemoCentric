@@ -31,6 +31,10 @@
             android:name=".activities.DataHistory"
             android:label="@string/title_activity_data_history" >
         </activity>
+        <activity
+            android:name=".activities.Graph2"
+            android:label="@string/title_activity_main" >
+        </activity>
     </application>
 
 </manifest>

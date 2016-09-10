@@ -4,4 +4,5 @@
     <string name="title_activity_data_history">Data History</string>
 
     <string name="hello_world">Hello world!</string>
+    <string name="title_activity_main">MainActivity</string>
 </resources>
