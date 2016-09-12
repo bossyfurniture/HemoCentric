@@ -38,6 +38,8 @@ import java.io.FileWriter;
 import java.io.InputStreamReader;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.LinkedBlockingQueue;
 
@@ -60,7 +62,8 @@ public class BluetoothDataDisplayActivity extends ActionBarActivity {
     private final String filename = "arddata_raw.txt";
 
     //internal data structures/variables
-    private static StringBuilder dataStream_sb = new StringBuilder();
+    private static StringBuilder dataStream_sb;// = new StringBuilder();
+    private static ArrayList<Byte> dataStream; //possibly use instead of string builder
     private static int numPeaks = 0;
     private static int numPoints = 0;
     private static boolean thresReached = false;
@@ -261,7 +264,7 @@ public class BluetoothDataDisplayActivity extends ActionBarActivity {
             public void uiDeviceConnected(BluetoothGatt gatt, BluetoothDevice device) {
 
                 Log.d("BDDA", "device connected");
-                //Log.e("BDDA", "device connected");
+                Log.e("BDDA", "device connected");
 
                 helper.getSupportedServices();
 
@@ -316,7 +319,7 @@ public class BluetoothDataDisplayActivity extends ActionBarActivity {
                     numPeaks = 0;
                     numPoints = 0;
                     lbq = new LinkedBlockingQueue<>();
-                    dataStream_sb = new StringBuilder(); //TODO: need to save data
+                    dataStream_sb = new StringBuilder(20000); //TODO: need to save data
 
                     //sending something to BT to begin measurement
                     helper.writeDataToCharacteristic(characteristic, dataBytes);
@@ -455,6 +458,21 @@ public class BluetoothDataDisplayActivity extends ActionBarActivity {
      */
     public static double RToD(int raw){ return (2.0*((double)raw*(5.0/256)) - 5.0); }
     public static int DToR(double dbl){ return ((int)Math.ceil((dbl + 5) * 256.0 / 5 / 2)); }
+
+
+    public static void saveToFile(){
+        String s = dataStream_sb.toString();
+        for(int i=0; i<s.length(); i+=2){ //taking string 2B at a time
+            char[] carr = {s.charAt(i), s.charAt(i+1)};
+            int a = Integer.parseInt(new String(carr));
+            if(a > 255 || a < 0) Log.e("BDDA", "out-of-range hex value produced");
+
+
+        }
+
+
+
+    }
 
     /**
      * This code works on a complete data-set.

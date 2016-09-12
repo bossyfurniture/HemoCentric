@@ -17,11 +17,18 @@
             />
 
         <TextView
-            android:text="Select a previous measurement below to view"
+            android:id="@+id/history_note"
+            android:text="Select a measurement file below to view graph"
             android:gravity="center"
             android:layout_below="@+id/LineChart_summary_statistics"
             android:layout_width="match_parent"
             android:layout_height="wrap_content" />
+
+        <View
+            android:layout_below="@+id/history_note"
+            android:layout_width="match_parent"
+            android:layout_height="1dp"
+            android:background="@android:color/darker_gray"/>
 
     </RelativeLayout>
 

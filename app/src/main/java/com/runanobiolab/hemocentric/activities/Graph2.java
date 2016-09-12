@@ -58,7 +58,7 @@ public class Graph2 extends AppCompatActivity {
                 }
 
                 // adding data points
-                if(graphData.length > 50000) Log.e("BDDA", "Large Data Set! (50k+) Crash possible");
+                if(graphData.length > 50000) Log.e("BDDA", "Large Data Set (50k+)! Crash possible");
                 for(double d : graphData) set.addEntry(new Entry(set.getEntryCount(),(float)d));
 
                 data.notifyDataChanged();
