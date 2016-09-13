@@ -10,10 +10,10 @@
         android:layout_height="wrap_content"
         android:layout_width="match_parent">
 
-        <com.github.mikephil.charting.charts.LineChart
+        <com.github.mikephil.charting.charts.BarChart
             android:id="@+id/LineChart_summary_statistics"
             android:layout_width="match_parent"
-            android:layout_height="wrap_content"
+            android:layout_height="100dp"
             />
 
         <TextView

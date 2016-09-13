@@ -590,6 +590,31 @@ public class BluetoothDataDisplayActivity extends ActionBarActivity {
 
     }
 
+    public static int getDataSetPeaks(File f){
+        if(f!= null && f.exists()) {
+            // Reading Input
+            FileInputStream fStream;
+            BufferedReader bReader = null;
+
+            try {
+                fStream = new FileInputStream(f);
+                bReader = new BufferedReader(new InputStreamReader(fStream));
+                int pks = 0;
+
+                bReader.readLine(); //tossing file header lines
+                String s = bReader.readLine();
+                s = s.substring(13);
+                pks = Integer.parseInt(s,10);
+
+                return pks;
+            } catch(Exception e) {
+                return 0;
+            }
+        }
+        return 0;
+
+    }
+
 
     final protected static char[] hexArray = "0123456789ABCDEF".toCharArray();
     public static String bytesToHex(byte[] bytes) {

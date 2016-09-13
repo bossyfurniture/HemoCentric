@@ -24,6 +24,9 @@ public class Graph2 extends AppCompatActivity {
     private TextView points;
     private TextView peaks;
     private double[] graphData;
+    private int pts = 0;
+    private int pks = 0;
+    private String filename = "File";
 
 
     @Override
@@ -35,11 +38,16 @@ public class Graph2 extends AppCompatActivity {
         points = (TextView)findViewById(R.id.TextView_history_pts);
         peaks = (TextView)findViewById(R.id.TextView_history_pks);
 
-        if (getIntent().hasExtra("all the data")) {
-            graphData = getIntent().getDoubleArrayExtra("all the data");
-        } else {
-            throw new IllegalArgumentException("Activity cannot find  extra " + "all the data");
-        }
+        graphData = getIntent().getDoubleArrayExtra("all the data");
+        pts = getIntent().getIntExtra("points", 0);
+        pks = getIntent().getIntExtra("peaks", 0);
+        points.setText("Points: " + pts);
+        peaks.setText("Peaks: " + pks);
+        
+        filename = getIntent().getStringExtra("filename");
+        filename = filename.substring(filename.lastIndexOf("/") + 1);
+
+
 
         if(graphData == null){
             chart.clear();
@@ -80,7 +88,7 @@ public class Graph2 extends AppCompatActivity {
     }
 
     private void initChart(){
-        chart.setDescription("Data Display: " + "[file-name]");
+        chart.setDescription("Data Display: " + filename);
         chart.setNoDataTextDescription("Invalid File or Data Format");
 
         chart.setTouchEnabled(true);
