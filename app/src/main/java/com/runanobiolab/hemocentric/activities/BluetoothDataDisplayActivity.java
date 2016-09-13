@@ -56,6 +56,7 @@ public class BluetoothDataDisplayActivity extends ActionBarActivity {
     private TextView peakData;
     private Button Graph;
     private Button historyBtn;
+    private Button saveMeasurement;
     private LineChart rtChart;
 
     //TESTING (temporary)
@@ -91,6 +92,7 @@ public class BluetoothDataDisplayActivity extends ActionBarActivity {
         peakData = (TextView)findViewById(R.id.TextView_peak_count);
         Graph = (Button)findViewById(R.id.Graph);
         historyBtn = (Button)findViewById(R.id.Button_history);
+        saveMeasurement = (Button)findViewById(R.id.Button_save_measure);
 
         //setting up graph & parameters
         rtChart = (LineChart)findViewById(R.id.LineChart_rtchart);
@@ -345,6 +347,26 @@ public class BluetoothDataDisplayActivity extends ActionBarActivity {
             }
         });
 
+        saveMeasurement.setOnClickListener(new View.OnClickListener(){
+            public void onClick(View v){
+                //TODO: Make save data set
+                /*
+                Thread t;
+                t = new Thread(new Runnable(){
+                    @Override
+                    public void run(){
+                        saveToFile();
+                    }
+                });
+                t.start();
+        */
+                saveToFile();
+            }
+        });
+
+
+
+
     }
 
     private void updateSet(ILineDataSet set){
@@ -362,6 +384,9 @@ public class BluetoothDataDisplayActivity extends ActionBarActivity {
         }
 
     }
+
+
+
 
 
     //create/change the appearance of the data set
@@ -433,22 +458,6 @@ public class BluetoothDataDisplayActivity extends ActionBarActivity {
     }
 
 
-    // Lightweight but still a good estimate of peaks.
-    // Triggers on the rising and falling edge to detect a peak.
-    // Threshold can be set.
-    public static int findPeaksByThreshold(double[] data, double threshold){
-        boolean aboveThreshold = false;
-        int peaksFound = 0;
-
-        for(int i=0; i<data.length; i++){
-            if(data[i] > threshold) aboveThreshold = true;
-            else if(aboveThreshold && data[i]<threshold){
-                peaksFound++;
-                aboveThreshold = false;
-            }
-        }
-        return peaksFound;
-    }
 
     /**
      * Converts the int received from the Arduino in to its corresponding double value
@@ -461,15 +470,44 @@ public class BluetoothDataDisplayActivity extends ActionBarActivity {
 
 
     public static void saveToFile(){
+        if(dataStream_sb==null || numPoints==0 || dataStream_sb.toString().equals(""))
+            return; //no data to save
         String s = dataStream_sb.toString();
-        for(int i=0; i<s.length(); i+=2){ //taking string 2B at a time
-            char[] carr = {s.charAt(i), s.charAt(i+1)};
-            int a = Integer.parseInt(new String(carr));
+        int pts = numPoints;
+        int pks = numPeaks;
+        if(pts != s.length()){
+            pts = Math.min(pts, s.length()/2);
+            if(pts > Integer.MAX_VALUE/2) pts = Integer.MAX_VALUE/2;
+            Log.e("BDDA", "Number of points to save: " +  pts + "\n");
+        }
+        double[] darr = new double[pts];
+        for(int i=0; i<pts; i++){
+            char[] carr = {s.charAt(2*i), s.charAt(2*i + 1)}; //taking string 2B at a time
+            int a = Integer.parseInt(new String(carr),16); //parsing as hex
+            //if(i%100 == 0) Log.e("BDDA", i + ":" + a + "\n");
             if(a > 255 || a < 0) Log.e("BDDA", "out-of-range hex value produced");
-
-
+            darr[i] = RToD(a); //converting raw int to double
         }
 
+        //String timeStamp = new SimpleDateFormat("yyyy.MM.dd.HH.mm.ss").format(new java.util.Date());
+        String timeStamp = new SimpleDateFormat("yyyyMMMdd-h:mma").format(new java.util.Date());
+        File file_double = makeExternalFile(timeStamp + ".txt");
+        BufferedWriter bw;
+
+        try {
+            bw = new BufferedWriter(new FileWriter(file_double, true),1000);
+            bw.write("Data Points: " + pts + "\n");
+            bw.write("Meas. Peaks: " + pks + "\n");
+            bw.write("====[raw data below]====\n");
+
+            for(double d : darr){
+                bw.write(d + "\n");
+            }
+            bw.flush();
+            bw.close();
+        }catch (Exception e){
+            e.printStackTrace();
+        }finally { }
 
 
     }
@@ -493,6 +531,10 @@ public class BluetoothDataDisplayActivity extends ActionBarActivity {
             try{
                 fStream = new FileInputStream(f);
                 bReader = new BufferedReader(new InputStreamReader(fStream));
+
+                bReader.readLine(); //tossing file header lines
+                bReader.readLine();
+                bReader.readLine();
 
                 // Reading ints from file
                 while(bReader.ready()){
@@ -568,6 +610,7 @@ public class BluetoothDataDisplayActivity extends ActionBarActivity {
                 (b[0] & 0xFF) << 24;
     }
 
+
     @Override
     public boolean onCreateOptionsMenu(Menu menu) {
         // Inflate the menu; this adds items to the action bar if it is present.
@@ -590,7 +633,7 @@ public class BluetoothDataDisplayActivity extends ActionBarActivity {
         return super.onOptionsItemSelected(item);
     }
 
-
+}
 
 
     /**
@@ -599,7 +642,25 @@ public class BluetoothDataDisplayActivity extends ActionBarActivity {
      * the future if processing the data becomes necessary to aid in accurate detection.
      */
 
+
     /*
+    // Lightweight but still a good estimate of peaks.
+    // Triggers on the rising and falling edge to detect a peak.
+    // Threshold can be set.
+    public static int findPeaksByThreshold(double[] data, double threshold){
+        boolean aboveThreshold = false;
+        int peaksFound = 0;
+
+        for(int i=0; i<data.length; i++){
+            if(data[i] > threshold) aboveThreshold = true;
+            else if(aboveThreshold && data[i]<threshold){
+                peaksFound++;
+                aboveThreshold = false;
+            }
+        }
+        return peaksFound;
+    }
+
     // Usage:
     //     double[] smoothedData = filterData(detrend(parseData(rawData)));
     //     boolean[] peakArray = findPeaks(smoothedData, peakThreshold, dropFactor=0);
@@ -726,4 +787,3 @@ public class BluetoothDataDisplayActivity extends ActionBarActivity {
     }
     */
 
-}

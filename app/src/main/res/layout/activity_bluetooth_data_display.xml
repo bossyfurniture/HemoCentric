@@ -44,11 +44,25 @@
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"/>
 
+        <TableLayout
+            android:stretchColumns="1"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent">
 
-        <Button android:id="@+id/Button_history"
-            android:text="Data History"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"/>
+            <TableRow>
+                <Button android:id="@+id/Button_history"
+                    android:text="Data History"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"/>
+
+                <Button android:id="@+id/Button_save_measure"
+                    android:text="Save Measurement"
+                    android:layout_gravity="right"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"/>
+            </TableRow>
+
+        </TableLayout>
 
     </LinearLayout>
 
